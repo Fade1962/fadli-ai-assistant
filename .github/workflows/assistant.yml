@@ -31,4 +31,4 @@ jobs:
     pwd
     ls -la
     find . -maxdepth 3 -type f
-    python assistant.py
+    python asisten.py
