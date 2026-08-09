@@ -12,7 +12,9 @@ TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 CHAT_ID = str(os.environ["CHAT_ID"])
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
-client = genai.Client(api_key=GEMINI_API_KEY)
+client = genai.Client(
+    api_key=GEMINI_API_KEY
+)
 
 TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
@@ -24,56 +26,59 @@ TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 SYSTEM_PROMPT = """
 Kamu adalah Fadli AI Assistant.
 
-Kamu adalah asisten pribadi Fadli yang fokus pada CONTENT,
-MARKETING, AI, SOCIAL MEDIA dan TEKNOLOGI.
+Fokus utama:
+- Content creation
+- Digital marketing
+- Social media
+- AI
+- Graphic design
+- Motion graphic
+- Video editing
+- Marketing otomotif
+- Daihatsu
+- Teknologi
+- SEO
+- Marketing strategy
 
-PROFIL FADLI:
-- Bekerja di Marketing Communication.
-- Fokus pada desain.
-- Social media.
-- Motion graphic.
-- Video editing.
-- Website.
-- SEO.
-- Digital marketing.
-- Marketing otomotif.
-- Banyak menangani Daihatsu.
-- Tertarik AI dan teknologi.
-- Membutuhkan ide konten yang praktis.
-- Suka jawaban singkat, jelas dan langsung bisa dikerjakan.
+Fadli menyukai jawaban:
+- Bahasa Indonesia
+- Singkat
+- Praktis
+- Langsung ke inti
+- Bisa langsung diterapkan
 
-TUGAS UTAMA:
+Jika Fadli meminta script, langsung buatkan.
 
-1. Menjawab chat dan pertanyaan Fadli.
-2. Membantu mencari ide konten.
-3. Membantu membuat script video.
-4. Menganalisis tren dan hype.
-5. Membantu marketing.
-6. Membantu social media.
-7. Membantu membuat hook.
-8. Membantu membuat CTA.
-9. Membantu mengubah berita/tren menjadi konten original.
-10. Memberikan saran yang praktis.
+Jika Fadli meminta informasi terbaru atau tren,
+gunakan pencarian web jika tersedia.
 
-GAYA JAWABAN:
-
-- Bahasa Indonesia.
-- Natural.
-- Singkat tetapi berguna.
-- Jangan terlalu formal.
-- Jangan terdengar seperti AI.
-- Langsung ke inti.
-- Jika Fadli meminta script, langsung buatkan.
-- Jika membutuhkan informasi terbaru, gunakan Google Search.
-- Jangan mengarang fakta.
-- Bedakan fakta dan opini.
-- Jangan menyalin konten orang lain.
-- Gunakan trend sebagai inspirasi untuk membuat angle original.
-
-Jika Fadli memberikan sebuah topik, bantu mengubahnya menjadi
-konten yang cocok untuk TikTok, Instagram Reels, YouTube Shorts,
-atau platform lain.
+Jangan mengarang fakta.
+Jangan menyalin konten orang lain.
 """
+
+
+# =========================================================
+# TELEGRAM
+# =========================================================
+
+def send_message(chat_id, text):
+
+    try:
+
+        response = requests.post(
+            f"{TELEGRAM_URL}/sendMessage",
+            data={
+                "chat_id": chat_id,
+                "text": text
+            },
+            timeout=20
+        )
+
+        response.raise_for_status()
+
+    except Exception as e:
+
+        print("Telegram send error:", e)
 
 
 # =========================================================
@@ -82,35 +87,198 @@ atau platform lain.
 
 def ask_gemini(message):
 
-    config = types.GenerateContentConfig(
-        tools=[
-            types.Tool(
-                google_search=types.GoogleSearch()
-            )
-        ]
-    )
+    print("Menghubungi Gemini...")
 
-    response = client.models.generate_content(
-        model="gemini-3.1-flash-lite",
-        contents=SYSTEM_PROMPT + """
+    try:
 
-Pesan dari Fadli:
+        # Untuk TEST PERTAMA:
+        # jangan gunakan Google Search dulu.
+        # Kita pastikan Gemini biasa bisa membalas.
 
-""" + message,
-        config=config
-    )
+        response = client.models.generate_content(
+            model="gemini-3.1-flash-lite",
+            contents=[
+                SYSTEM_PROMPT,
+                "\nPesan Fadli:\n",
+                message
+            ]
+        )
 
-    return response.text
+        if not response.text:
+
+            return "⚠️ Gemini tidak memberikan jawaban."
+
+        print("Gemini berhasil menjawab.")
+
+        return response.text
+
+    except Exception as e:
+
+        print("GEMINI ERROR:")
+        print(repr(e))
+
+        return (
+            "⚠️ Gemini mengalami masalah.\n\n"
+            f"Error:\n{str(e)[:1500]}"
+        )
 
 
 # =========================================================
-# TELEGRAM SEND
+# TELEGRAM UPDATES
 # =========================================================
 
-def send_message(chat_id, text):
+def get_updates(offset=None):
 
-    # Telegram mempunyai batas panjang pesan.
-    # Pecah pesan jika terlalu panjang.
+    response = requests.get(
+        f"{TELEGRAM_URL}/getUpdates",
+        params={
+            "offset": offset,
+            "timeout": 20
+        },
+        timeout=30
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+# =========================================================
+# BOT
+# =========================================================
+
+def run_bot():
+
+    print("==============================")
+    print("FADLI AI ASSISTANT")
+    print("==============================")
+    print("Bot aktif.")
+    print("Menunggu pesan Telegram...")
+
+    offset = None
+
+    while True:
+
+        try:
+
+            data = get_updates(offset)
+
+            if not data.get("ok"):
+
+                print("Telegram API error:")
+                print(data)
+
+                time.sleep(5)
+                continue
+
+            for update in data.get("result", []):
+
+                offset = update["update_id"] + 1
+
+                message = update.get("message")
+
+                if not message:
+                    continue
+
+                text = message.get("text")
+
+                if not text:
+                    continue
+
+                chat_id = str(
+                    message["chat"]["id"]
+                )
+
+                print("==============================")
+                print("CHAT ID:", chat_id)
+                print("MESSAGE:", text)
+
+                # =================================================
+                # SECURITY
+                # =================================================
+
+                if chat_id != CHAT_ID:
+
+                    print("Chat tidak diizinkan.")
+
+                    continue
+
+                # =================================================
+                # PING
+                # =================================================
+
+                if text.lower() == "/ping":
+
+                    send_message(
+                        chat_id,
+                        "🟢 Fadli AI aktif."
+                    )
+
+                    continue
+
+                # =================================================
+                # START
+                # =================================================
+
+                if text.lower() == "/start":
+
+                    send_message(
+                        chat_id,
+                        """🤖 Fadli AI aktif.
+
+Silakan kirim pertanyaan atau perintah.
+
+Contoh:
+
+Cari tren AI hari ini
+
+Buatkan script Reels tentang AI
+
+Cari ide konten Daihatsu
+
+Analisis topik ini:
+...
+
+/ping"""
+                    )
+
+                    continue
+
+                # =================================================
+                # NORMAL MESSAGE
+                # =================================================
+
+                send_message(
+                    chat_id,
+                    "🧠 Sedang berpikir..."
+                )
+
+                answer = ask_gemini(text)
+
+                send_message(
+                    chat_id,
+                    answer
+                )
+
+                print("Jawaban selesai dikirim.")
+
+        except Exception as e:
+
+            print("==============================")
+            print("BOT ERROR")
+            print(repr(e))
+            print("==============================")
+
+            time.sleep(5)
+
+
+# =========================================================
+# MAIN
+# =========================================================
+
+if __name__ == "__main__":
+
+    run_bot()    # Pecah pesan jika terlalu panjang.
 
     max_length = 4000
 
