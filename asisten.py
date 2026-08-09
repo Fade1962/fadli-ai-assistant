@@ -1,159 +1,290 @@
 import os
 import time
+import json
 import requests
 from google import genai
 from google.genai import types
-
-# =========================================================
-# CONFIG
-# =========================================================
 
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 CHAT_ID = str(os.environ["CHAT_ID"])
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
-client = genai.Client(
-    api_key=GEMINI_API_KEY
-)
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
+MEMORY_FILE = "memory.json"
 
-# =========================================================
-# PROFIL FADLI
-# =========================================================
 
 SYSTEM_PROMPT = """
-Kamu adalah Fadli AI Assistant.
+Kamu adalah FADLI AI PERSONAL BRANDING ASSISTANT.
 
-Fokus utama:
-- Content creation
-- Digital marketing
-- Social media
-- AI
-- Graphic design
-- Motion graphic
-- Video editing
-- Marketing otomotif
-- Daihatsu
-- Teknologi
-- SEO
-- Marketing strategy
+TUGAS:
+Membantu Fadli membangun personal branding di TikTok,
+Instagram Reels, YouTube Shorts dan media sosial.
 
-Fadli menyukai jawaban:
-- Bahasa Indonesia
-- Singkat
-- Praktis
-- Langsung ke inti
-- Bisa langsung diterapkan
+IDENTITAS FADLI:
 
-Jika Fadli meminta script, langsung buatkan.
+- Suami.
+- Ayah 2 anak.
+- Seorang pekerja.
+- Bekerja di Marketing Communication.
+- Memiliki skill desain.
+- Social media.
+- Motion graphic.
+- Video editing.
+- Digital marketing.
+- AI.
+- Teknologi.
+- Marketing otomotif.
+- Sedang berusaha meningkatkan kondisi ekonomi keluarga.
+- Sedang belajar skill baru.
+- Sedang mencari peluang berkembang.
 
-Jika Fadli meminta informasi terbaru atau tren,
-gunakan pencarian web jika tersedia.
+POSITIONING:
 
-Jangan mengarang fakta.
-Jangan menyalin konten orang lain.
+"Seorang bapak 2 anak yang bekerja, belajar,
+berjuang memperbaiki kehidupan keluarga,
+dan memanfaatkan teknologi serta kreativitas
+untuk berkembang."
+
+Jangan membuat Fadli terlihat seperti:
+- motivator sukses
+- orang kaya
+- financial guru
+- pakar kehidupan
+
+KEKUATAN PERSONAL BRANDING:
+
+Perjalanan nyata.
+
+Konten harus:
+- jujur
+- relatable
+- personal
+- natural
+- tidak menggurui
+- tidak sok sukses
+- tidak berlebihan
+
+PILAR:
+
+1. Kehidupan pekerja
+2. Ekonomi keluarga
+3. Gaji dan penghasilan
+4. Side hustle
+5. Menjadi suami
+6. Menjadi ayah
+7. Parenting realistis
+8. AI untuk pekerja biasa
+9. Skill baru
+10. Digital marketing
+11. Content creation
+12. Teknologi
+13. Gen Z dan Milenial
+14. Fenomena sosial
+15. Tren internet
+16. Otomotif jika relevan
+
+ATURAN:
+
+Jangan mengarang pengalaman pribadi Fadli.
+
+Jangan mengeksploitasi anak atau keluarga.
+
+Jangan membuat masalah keluarga menjadi clickbait.
+
+Jangan mengarang berita.
+
+Jangan menyalin konten creator lain.
+
+Jika membahas tren terbaru, gunakan Google Search.
+
+Jika diminta membuat script:
+
+HOOK
+STORY
+INSIGHT
+ENDING
+CTA
+
+Script harus terdengar seperti orang Indonesia
+sedang berbicara, bukan artikel.
+
+Durasi ideal 30-60 detik.
+
+========================================================
+MEMORY
+========================================================
+
+Gunakan memory untuk memahami:
+
+- topik yang disukai Fadli
+- topik yang tidak disukai
+- skor yang diberikan Fadli
+- feedback Fadli
 """
 
 
-# =========================================================
-# TELEGRAM
-# =========================================================
-
-def send_message(chat_id, text):
+def load_memory():
 
     try:
 
-        response = requests.post(
-            f"{TELEGRAM_URL}/sendMessage",
-            data={
-                "chat_id": chat_id,
-                "text": text
-            },
-            timeout=20
+        with open(
+            MEMORY_FILE,
+            "r",
+            encoding="utf-8"
+        ) as f:
+
+            return json.load(f)
+
+    except:
+
+        return {
+            "liked": [],
+            "disliked": [],
+            "scores": [],
+            "feedback": []
+        }
+
+
+def save_memory(memory):
+
+    with open(
+        MEMORY_FILE,
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+        json.dump(
+            memory,
+            f,
+            ensure_ascii=False,
+            indent=2
         )
 
-        response.raise_for_status()
 
-    except Exception as e:
+def ask_gemini(text):
 
-        print("Telegram send error:", e)
+    memory = load_memory()
 
+    memory_context = f"""
 
-# =========================================================
-# GEMINI
-# =========================================================
+MEMORY FADLI:
 
-def ask_gemini(message):
+TOPIK DISUKAI:
+{memory.get("liked", [])}
 
-    print("Menghubungi Gemini...")
+TOPIK TIDAK DISUKAI:
+{memory.get("disliked", [])}
 
-    try:
+SCORE:
+{memory.get("scores", [])}
 
-        # Untuk TEST PERTAMA:
-        # jangan gunakan Google Search dulu.
-        # Kita pastikan Gemini biasa bisa membalas.
+FEEDBACK:
+{memory.get("feedback", [])}
+"""
 
-        response = client.models.generate_content(
-            model="gemini-3.1-flash-lite",
-            contents=[
-                SYSTEM_PROMPT,
-                "\nPesan Fadli:\n",
-                message
+    use_search = any(
+        keyword in text.lower()
+        for keyword in [
+            "viral",
+            "tren",
+            "trend",
+            "terbaru",
+            "hari ini",
+            "berita",
+            "ramai",
+            "hype",
+            "tiktok",
+            "instagram",
+            "youtube",
+            "ekonomi",
+            "ai",
+            "teknologi"
+        ]
+    )
+
+    config = None
+
+    if use_search:
+
+        config = types.GenerateContentConfig(
+            tools=[
+                types.Tool(
+                    google_search=types.GoogleSearch()
+                )
             ]
         )
 
-        if not response.text:
+    try:
 
-            return "⚠️ Gemini tidak memberikan jawaban."
+        response = client.models.generate_content(
 
-        print("Gemini berhasil menjawab.")
+            model="gemini-3.1-flash-lite",
+
+            contents=[
+                SYSTEM_PROMPT,
+                memory_context,
+                "\nPESAN FADLI:\n",
+                text
+            ],
+
+            config=config
+        )
 
         return response.text
 
-    except Exception as e:
-
-        print("GEMINI ERROR:")
-        print(repr(e))
+    except Exception as error:
 
         return (
-            "⚠️ Gemini mengalami masalah.\n\n"
-            f"Error:\n{str(e)[:1500]}"
+            "⚠️ Terjadi error Gemini:\n\n"
+            + str(error)[:1500]
         )
 
 
-# =========================================================
-# TELEGRAM UPDATES
-# =========================================================
+def send_message(chat_id, text):
+
+    max_length = 4000
+
+    for i in range(
+        0,
+        len(text),
+        max_length
+    ):
+
+        requests.post(
+            f"{TELEGRAM_URL}/sendMessage",
+            data={
+                "chat_id": chat_id,
+                "text": text[
+                    i:i + max_length
+                ]
+            },
+            timeout=30
+        )
+
 
 def get_updates(offset=None):
 
     response = requests.get(
+
         f"{TELEGRAM_URL}/getUpdates",
+
         params={
             "offset": offset,
-            "timeout": 20
+            "timeout": 30
         },
-        timeout=30
-    )
 
-    response.raise_for_status()
+        timeout=40
+    )
 
     return response.json()
 
 
-# =========================================================
-# BOT
-# =========================================================
-
 def run_bot():
 
-    print("==============================")
-    print("FADLI AI ASSISTANT")
-    print("==============================")
-    print("Bot aktif.")
-    print("Menunggu pesan Telegram...")
+    print("FADLI AI ONLINE")
 
     offset = None
 
@@ -163,24 +294,25 @@ def run_bot():
 
             data = get_updates(offset)
 
-            if not data.get("ok"):
+            for update in data.get(
+                "result",
+                []
+            ):
 
-                print("Telegram API error:")
-                print(data)
+                offset = update[
+                    "update_id"
+                ] + 1
 
-                time.sleep(5)
-                continue
-
-            for update in data.get("result", []):
-
-                offset = update["update_id"] + 1
-
-                message = update.get("message")
+                message = update.get(
+                    "message"
+                )
 
                 if not message:
                     continue
 
-                text = message.get("text")
+                text = message.get(
+                    "text"
+                )
 
                 if not text:
                     continue
@@ -189,23 +321,12 @@ def run_bot():
                     message["chat"]["id"]
                 )
 
-                print("==============================")
-                print("CHAT ID:", chat_id)
-                print("MESSAGE:", text)
-
-                # =================================================
-                # SECURITY
-                # =================================================
-
                 if chat_id != CHAT_ID:
-
-                    print("Chat tidak diizinkan.")
-
                     continue
 
-                # =================================================
+                # =========================================
                 # PING
-                # =================================================
+                # =========================================
 
                 if text.lower() == "/ping":
 
@@ -216,292 +337,118 @@ def run_bot():
 
                     continue
 
-                # =================================================
-                # START
-                # =================================================
+                # =========================================
+                # HELP
+                # =========================================
 
                 if text.lower() == "/start":
 
                     send_message(
                         chat_id,
-                        """🤖 Fadli AI aktif.
 
-Silakan kirim pertanyaan atau perintah.
+                        """🤖 FADLI AI PERSONAL BRANDING
 
-Contoh:
+Saya siap membantu Anda.
 
-Cari tren AI hari ini
+🔥 /scout
+Cari tren terbaru
 
-Buatkan script Reels tentang AI
+📊 /memory
+Lihat preferensi yang sudah dipelajari
 
-Cari ide konten Daihatsu
+🧠 /ping
+Cek bot
 
-Analisis topik ini:
-...
+Atau langsung chat:
 
-/ping"""
+"Buatkan script..."
+
+"Menurut kamu angle ini bagus?"
+
+"Apakah topik ini cocok untuk personal branding saya?"
+
+"Revisi hook ini."
+
+Saya bisa diajak diskusi."""
                     )
 
                     continue
 
-                # =================================================
-                # NORMAL MESSAGE
-                # =================================================
+                # =========================================
+                # MEMORY
+                # =========================================
 
-                send_message(
-                    chat_id,
-                    "🧠 Sedang berpikir..."
-                )
+                if text.lower() == "/memory":
 
-                answer = ask_gemini(text)
-
-                send_message(
-                    chat_id,
-                    answer
-                )
-
-                print("Jawaban selesai dikirim.")
-
-        except Exception as e:
-
-            print("==============================")
-            print("BOT ERROR")
-            print(repr(e))
-            print("==============================")
-
-            time.sleep(5)
-
-
-# =========================================================
-# MAIN
-# =========================================================
-
-if __name__ == "__main__":
-
-    run_bot()    # Pecah pesan jika terlalu panjang.
-
-    max_length = 4000
-
-    parts = [
-        text[i:i + max_length]
-        for i in range(0, len(text), max_length)
-    ]
-
-    for part in parts:
-
-        response = requests.post(
-            f"{TELEGRAM_URL}/sendMessage",
-            data={
-                "chat_id": chat_id,
-                "text": part
-            },
-            timeout=30
-        )
-
-        if not response.ok:
-            print("Telegram error:", response.text)
-
-
-# =========================================================
-# MORNING CONTENT SCOUT
-# =========================================================
-
-def morning_scout():
-
-    prompt = """
-Cari tren, hype, berita, fenomena atau topik internet terbaru
-yang sedang naik dan berpotensi menjadi konten.
-
-Fokus:
-
-- AI
-- Teknologi
-- Marketing
-- Social media
-- Content creator
-- Digital marketing
-- Graphic design
-- Video editing
-- Gen Z
-- Otomotif
-- Daihatsu
-- Bisnis
-- Fenomena internet
-
-Cari informasi terbaru dari web.
-
-Pilih 3 topik terbaik.
-
-Untuk setiap topik:
-
-🔥 TOPIK
-📈 VIRAL SCORE 1-10
-📌 KENAPA RAMAI
-🎯 ANGLE UNTUK FADLI
-
-Kemudian buat:
-
-🎬 HOOK
-📝 SCRIPT 30-60 DETIK
-📱 FORMAT KONTEN
-🎥 VISUAL
-💬 CTA
-
-Jangan menyalin script orang lain.
-
-Buat angle original.
-
-Di akhir pilih:
-
-🏆 TOP PICK HARI INI
-
-dan jelaskan kenapa topik tersebut paling layak dibuat.
-"""
-
-    return ask_gemini(prompt)
-
-
-# =========================================================
-# TELEGRAM UPDATE
-# =========================================================
-
-def get_updates(offset=None):
-
-    response = requests.get(
-        f"{TELEGRAM_URL}/getUpdates",
-        params={
-            "offset": offset,
-            "timeout": 30
-        },
-        timeout=40
-    )
-
-    return response.json()
-
-
-# =========================================================
-# BOT
-# =========================================================
-
-def run_bot():
-
-    print("================================")
-    print("FADLI AI ASSISTANT")
-    print("================================")
-    print("Bot aktif.")
-    print("Menunggu chat Telegram...")
-
-    offset = None
-
-    while True:
-
-        try:
-
-            data = get_updates(offset)
-
-            if not data.get("ok"):
-                print("Telegram API error:", data)
-                time.sleep(5)
-                continue
-
-            for update in data.get("result", []):
-
-                offset = update["update_id"] + 1
-
-                message = update.get("message")
-
-                if not message:
-                    continue
-
-                text = message.get("text")
-
-                if not text:
-                    continue
-
-                chat_id = str(message["chat"]["id"])
-
-                # =================================================
-                # SECURITY
-                # =================================================
-
-                # Hanya Fadli yang boleh menggunakan bot.
-
-                if chat_id != CHAT_ID:
-
-                    print(
-                        "Pesan dari chat yang tidak diizinkan:",
-                        chat_id
-                    )
-
-                    continue
-
-                print("================================")
-                print("Pesan Fadli:")
-                print(text)
-
-                # =================================================
-                # COMMAND
-                # =================================================
-
-                if text.lower() == "/start":
+                    memory = load_memory()
 
                     send_message(
                         chat_id,
-                        """🤖 Fadli AI aktif.
 
-Saya siap membantu.
-
-Contoh:
-
-🔎 Cari tren AI hari ini
-
-🔥 Apa yang sedang viral?
-
-🎬 Buatkan script tentang AI
-
-📱 Buatkan ide konten Daihatsu
-
-🧠 Analisis topik ini:
-...
-
-/trend
-/scout
-/ping"""
+                        json.dumps(
+                            memory,
+                            ensure_ascii=False,
+                            indent=2
+                        )
                     )
 
                     continue
 
+                # =========================================
+                # FEEDBACK SCORE
+                # =========================================
 
-                if text.lower() == "/ping":
+                lower = text.lower()
+
+                memory = load_memory()
+
+                if (
+                    "score" in lower
+                    or "nilai" in lower
+                    or "saya suka" in lower
+                    or "saya tidak suka" in lower
+                    or "kurangi" in lower
+                    or "lebih banyak" in lower
+                ):
+
+                    memory["feedback"].append(text)
+
+                    if (
+                        "suka" in lower
+                        or "bagus" in lower
+                    ):
+
+                        memory["liked"].append(text)
+
+                    if (
+                        "tidak suka" in lower
+                        or "kurangi" in lower
+                    ):
+
+                        memory["disliked"].append(text)
+
+                    if (
+                        "score" in lower
+                        or "nilai" in lower
+                    ):
+
+                        memory["scores"].append(text)
+
+                    save_memory(memory)
 
                     send_message(
                         chat_id,
-                        "🟢 Fadli AI aktif dan siap menerima perintah."
+
+                        "🧠 Feedback tersimpan.\n\n"
+                        "Saya akan gunakan untuk "
+                        "menyesuaikan rekomendasi berikutnya."
                     )
 
                     continue
 
-
-                if text.lower() in ["/trend", "/scout"]:
-
-                    send_message(
-                        chat_id,
-                        "🔎 Sedang mencari tren terbaru..."
-                    )
-
-                    answer = morning_scout()
-
-                    send_message(
-                        chat_id,
-                        "🔥 FADLI AI CONTENT SCOUT\n\n" + answer
-                    )
-
-                    continue
-
-
-                # =================================================
+                # =========================================
                 # NORMAL CHAT
-                # =================================================
+                # =========================================
 
                 send_message(
                     chat_id,
@@ -514,20 +461,16 @@ Contoh:
                     chat_id,
                     answer
                 )
-
-                print("Jawaban berhasil dikirim.")
 
         except Exception as error:
 
-            print("ERROR:")
-            print(error)
+            print(
+                "ERROR:",
+                repr(error)
+            )
 
             time.sleep(5)
 
-
-# =========================================================
-# MAIN
-# =========================================================
 
 if __name__ == "__main__":
 
