@@ -13,6 +13,36 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Debug Repository
+        run: |
+          echo "=== CURRENT DIRECTORY ==="
+          pwd
+
+          echo "=== GIT STATUS ==="
+          git status
+
+          echo "=== CURRENT BRANCH ==="
+          git branch --show-current
+
+          echo "=== CURRENT COMMIT ==="
+          git log -1 --oneline
+
+          echo "=== ROOT FILES ==="
+          ls -lah
+
+          echo "=== ALL PYTHON FILES ==="
+          find . -type f -name "*.py" -print
+
+          echo "=== CHECK ASISTEN.PY ==="
+          if [ -f "./asisten.py" ]; then
+            echo "asisten.py FOUND"
+            ls -lah ./asisten.py
+          else
+            echo "asisten.py NOT FOUND"
+          fi
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -24,21 +54,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Check files
-        run: |
-          echo "Current directory:"
-          pwd
-
-          echo "Repository files:"
-          ls -lah
-
-          echo "Checking asisten.py:"
-          ls -lah asisten.py
-
       - name: Run AI Assistant
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          python asisten.py
+          python ./asisten.py
