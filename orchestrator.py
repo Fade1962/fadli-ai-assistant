@@ -87,7 +87,6 @@ def handle_text(chat_id, text):
             f"{context}"
         )
 
-    send_message(chat_id, "🤖 Memproses permintaan...")
     try:
         answer, provider = ask_ai(SYSTEM_PROMPT, user_prompt)
     except Exception as exc:
