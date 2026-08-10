@@ -2,92 +2,153 @@ import os
 import requests
 
 
-OPENROUTER_API_KEY=os.environ.get(
+OPENROUTER_API_KEY = os.environ.get(
     "OPENROUTER_API_KEY"
 )
 
 
 
+# =========================================================
+# OPENROUTER TEXT AI
+#
+# Backup provider
+#
+# =========================================================
+
+
 def ask_openrouter(
-    system_prompt,
-    text
+    prompt
 ):
+
 
     if not OPENROUTER_API_KEY:
 
         raise Exception(
-            "OPENROUTER_KEY_MISSING"
+            "OPENROUTER_API_KEY_NOT_CONFIGURED"
         )
 
 
-    response=requests.post(
+
+    response = requests.post(
+
 
         "https://openrouter.ai/api/v1/chat/completions",
 
 
         headers={
 
+
             "Authorization":
+
             f"Bearer {OPENROUTER_API_KEY}",
 
 
             "Content-Type":
-            "application/json"
+
+            "application/json",
+
+
+            "HTTP-Referer":
+
+            "https://github.com",
+
+
+            "X-Title":
+
+            "Fadli AI Assistant"
 
         },
+
 
 
         json={
 
+
             "model":
+
             "openrouter/free",
+
 
 
             "messages":[
 
-                {
-                    "role":
-                    "system",
-
-                    "content":
-                    system_prompt
-
-                },
 
                 {
+
+
                     "role":
+
                     "user",
 
+
                     "content":
-                    text
+
+                    prompt
+
 
                 }
 
-            ]
+
+            ],
+
+
+
+            "temperature":
+
+            0.7,
+
+
+
+            "max_tokens":
+
+            2000
 
         },
 
 
-        timeout=60
+
+        timeout=90
 
     )
+
 
 
     if response.status_code != 200:
 
+
         raise Exception(
-            response.text
+
+            f"OPENROUTER_HTTP_{response.status_code}"
+
         )
 
 
-    data=response.json()
+
+    data = response.json()
 
 
-    return (
+
+    answer = (
 
         data["choices"][0]
+
         ["message"]
+
         ["content"]
-        .strip()
 
     )
+
+
+
+    if not answer:
+
+
+        raise Exception(
+
+            "OPENROUTER_EMPTY_RESPONSE"
+
+        )
+
+
+
+    return answer.strip()
