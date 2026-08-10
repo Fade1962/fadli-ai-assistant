@@ -3,70 +3,56 @@ import os
 import time
 import json
 import requests
-
 from google import genai
-from google.genai import types
 
 
 # =========================================================
-# FADLI AI ASSISTANT
-# Telegram 24/7
+# FADLI AI — TELEGRAM 24/7
 #
-# AI ROUTER:
-# Gemini → Groq → OpenRouter
+# ROUTER:
+# GROQ → OPENROUTER → GEMINI
 #
-# Tidak mengirim:
+# Tidak pernah mengirim:
 # - Sedang berpikir
 # - Gemini limit
 # - API error
 #
-# Setiap jawaban:
-# ———
-# 🤖 Fadli AI • NamaAI
+# Hanya 1 balasan final.
 # =========================================================
 
 
-# =========================================================
-# ENVIRONMENT
-# =========================================================
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+CHAT_ID = str(os.environ.get("CHAT_ID", ""))
 
-TELEGRAM_TOKEN = os.environ.get(
-    "TELEGRAM_TOKEN"
-)
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-CHAT_ID = str(
-    os.environ.get("CHAT_ID", "")
-)
-
-GEMINI_API_KEY = os.environ.get(
-    "GEMINI_API_KEY"
-)
-
-GROQ_API_KEY = os.environ.get(
-    "GROQ_API_KEY"
-)
-
-OPENROUTER_API_KEY = os.environ.get(
-    "OPENROUTER_API_KEY"
-)
-
-
-# =========================================================
-# TELEGRAM
-# =========================================================
+MEMORY_FILE = "memory.json"
 
 TELEGRAM_URL = (
-    f"https://api.telegram.org/"
-    f"bot{TELEGRAM_TOKEN}"
+    f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 )
+
+
+# =========================================================
+# GEMINI CLIENT
+# =========================================================
+
+gemini = None
+
+if GEMINI_API_KEY:
+    try:
+        gemini = genai.Client(
+            api_key=GEMINI_API_KEY
+        )
+    except Exception:
+        gemini = None
 
 
 # =========================================================
 # MEMORY
 # =========================================================
-
-MEMORY_FILE = "memory.json"
-
 
 def load_memory():
 
@@ -76,9 +62,9 @@ def load_memory():
             MEMORY_FILE,
             "r",
             encoding="utf-8"
-        ) as file:
+        ) as f:
 
-            return json.load(file)
+            return json.load(f)
 
     except Exception:
 
@@ -99,11 +85,11 @@ def save_memory(memory):
             MEMORY_FILE,
             "w",
             encoding="utf-8"
-        ) as file:
+        ) as f:
 
             json.dump(
                 memory,
-                file,
+                f,
                 ensure_ascii=False,
                 indent=2
             )
@@ -111,8 +97,8 @@ def save_memory(memory):
     except Exception as error:
 
         print(
-            "Memory save error:",
-            error
+            "MEMORY ERROR:",
+            repr(error)
         )
 
 
@@ -123,19 +109,19 @@ def memory_summary():
     return f"""
 MEMORY FADLI
 
-TOPIK YANG DISUKAI:
+TOPIK DISUKAI:
 {memory.get("preferred_topics", [])}
 
-TOPIK YANG DIHINDARI:
+TOPIK DIHINDARI:
 {memory.get("avoided_topics", [])}
 
-SCORE TERBARU:
+SCORE:
 {memory.get("scores", [])[-20:]}
 
-FEEDBACK TERBARU:
+FEEDBACK:
 {memory.get("feedback", [])[-20:]}
 
-GAYA KONTEN:
+GAYA:
 {memory.get("content_style", {})}
 """
 
@@ -146,32 +132,11 @@ GAYA KONTEN:
 
 SYSTEM_PROMPT = """
 
-Kamu adalah FADLI AI PERSONAL ASSISTANT.
+Kamu adalah FADLI AI.
 
-Kamu bukan sekadar chatbot.
+Kamu adalah partner berpikir pribadi Fadli.
 
-Kamu adalah partner berpikir Fadli untuk:
-
-- personal branding
-- content creation
-- TikTok
-- Instagram Reels
-- YouTube Shorts
-- digital marketing
-- desain
-- social media
-- AI
-- teknologi
-- marketing otomotif
-- kehidupan pekerja
-- ekonomi keluarga
-- pengembangan skill
-
-========================================================
-IDENTITAS FADLI
-========================================================
-
-Fadli adalah:
+IDENTITAS FADLI:
 
 - Suami
 - Bapak 2 anak
@@ -180,90 +145,56 @@ Fadli adalah:
 - Designer
 - Social media
 - Motion graphic
-- Video editing
 - Digital marketing
 - Marketing otomotif
-- Sedang meningkatkan kemampuan AI
-- Sedang berusaha meningkatkan kondisi ekonomi keluarga
+- Sedang belajar AI
+- Sedang berjuang meningkatkan ekonomi keluarga
 
-POSITIONING PERSONAL BRANDING:
+PERSONAL BRANDING:
 
-"Bapak 2 anak yang bekerja, belajar,
-dan berjuang memperbaiki ekonomi keluarga
-dengan memanfaatkan skill, kreativitas,
-teknologi dan AI."
+"Bapak 2 anak yang bekerja, belajar dan berjuang
+memperbaiki kehidupan keluarga dengan skill,
+kreativitas, teknologi dan AI."
 
-Jangan membuat Fadli terlihat seperti:
-
+Jangan membuat Fadli terlihat:
+- kaya
+- sukses berlebihan
 - motivator
-- orang kaya
 - financial guru
-- pakar kehidupan
-- pengusaha sukses besar
+- pengusaha besar
 
-Konten harus terasa:
+Gaya:
 
-- nyata
-- sederhana
-- relatable
+- Indonesia
+- natural
+- praktis
+- singkat
+- komunikatif
 - jujur
-- manusiawi
+- relatable
 - tidak menggurui
-- tidak sok sukses
 
-========================================================
-PILAR KONTEN
-========================================================
+Fokus:
 
-Prioritaskan:
-
-1. Kehidupan pekerja
-2. Ekonomi keluarga
+1. Ekonomi keluarga
+2. Dunia kerja
 3. Gaji
-4. Penghasilan tambahan
-5. Side hustle
-6. Menjadi suami
-7. Menjadi ayah
-8. Parenting realistis
-9. AI untuk orang biasa
-10. Skill baru
-11. Digital marketing
-12. Content creation
-13. Teknologi
+4. Side hustle
+5. AI
+6. Teknologi
+7. Parenting realistis
+8. Kehidupan bapak
+9. Content creation
+10. TikTok
+11. Instagram
+12. Digital marketing
+13. Marketing
 14. Tren internet
-15. Fenomena sosial
-16. Gen Z
-17. Milenial
-18. Otomotif jika relevan
-
-========================================================
-GAYA KOMUNIKASI
-========================================================
-
-Jawaban:
-
-- Bahasa Indonesia
-- Natural
-- Ringkas
-- Praktis
-- Tidak bertele-tele
-- Seperti teman diskusi yang pintar
-- Boleh mengkritik Fadli
-- Jangan selalu setuju
-
-Jika ide Fadli kurang bagus:
-
-1. Katakan bahwa ide tersebut kurang kuat
-2. Jelaskan alasannya
-3. Berikan alternatif
-
-========================================================
-KONTEN
-========================================================
+15. Gen Z
+16. Milenial
+17. Otomotif jika relevan
 
 Jika Fadli meminta script:
-
-Gunakan:
 
 HOOK
 STORY
@@ -271,196 +202,25 @@ INSIGHT
 ENDING
 CTA
 
-Target:
+Target 30–60 detik.
 
-30–60 detik.
+Jika Fadli meminta pendapat:
+berikan opini jujur.
 
-Hook harus menarik dalam 1–3 detik pertama.
+Jika idenya kurang bagus:
+katakan terus terang dan berikan alternatif.
 
-Hindari bahasa yang terlalu formal.
+Jangan mengarang pengalaman pribadi Fadli.
 
-Jangan membuat pengalaman pribadi
-Fadli yang tidak pernah diberikan.
-
-Jangan mengarang fakta.
-
-Jika membutuhkan informasi terbaru,
-gunakan search jika tersedia.
-
-========================================================
-PERAN SEBAGAI PARTNER
-========================================================
-
-Jika Fadli sedang brainstorming:
-
-Jangan langsung membuat jawaban panjang.
-
-Bantu mengembangkan ide.
-
-Jika Fadli mengatakan:
-
-"Menurut kamu?"
-
-Berikan opini.
-
-Jika Fadli mengatakan:
-
-"Jelek gak?"
-
-Berikan kritik jujur.
-
-Jika Fadli mengatakan:
-
-"Bagaimana kalau..."
-
-Analisis ide tersebut.
-
-Jika Fadli meminta konten viral:
-
-Cari angle yang relevan dengan
-personal branding Fadli.
-
-Jangan sekadar mengejar viral.
+Jika pertanyaan membutuhkan informasi terbaru,
+gunakan kemampuan pencarian jika tersedia.
 
 Tujuan utama:
-
-Viral + relevan + membangun personal branding.
+membantu Fadli membuat keputusan,
+membuat konten,
+berpikir lebih baik,
+dan membangun personal branding.
 """
-
-
-# =========================================================
-# GEMINI CLIENT
-# =========================================================
-
-gemini = None
-
-if GEMINI_API_KEY:
-
-    try:
-
-        gemini = genai.Client(
-            api_key=GEMINI_API_KEY
-        )
-
-    except Exception as error:
-
-        print(
-            "Gemini initialization error:",
-            error
-        )
-
-
-# =========================================================
-# GEMINI LIMIT DETECTOR
-# =========================================================
-
-def is_gemini_limit(error):
-
-    text = str(error).lower()
-
-    keywords = [
-
-        "429",
-        "quota",
-        "rate limit",
-        "ratelimit",
-        "resource exhausted",
-        "resource_exhausted",
-        "too many requests",
-        "requests per minute",
-        "requests per day",
-        "exceeded",
-        "limit"
-    ]
-
-    return any(
-        keyword in text
-        for keyword in keywords
-    )
-
-
-# =========================================================
-# GEMINI
-# =========================================================
-
-def ask_gemini(
-    text,
-    search=False
-):
-
-    if not gemini:
-
-        raise Exception(
-            "GEMINI_UNAVAILABLE"
-        )
-
-    config = None
-
-    if search:
-
-        try:
-
-            config = types.GenerateContentConfig(
-
-                tools=[
-                    types.Tool(
-                        google_search=types.GoogleSearch()
-                    )
-                ]
-            )
-
-        except Exception:
-
-            config = None
-
-    try:
-
-        response = gemini.models.generate_content(
-
-            model="gemini-3.1-flash-lite",
-
-            contents=[
-                SYSTEM_PROMPT,
-
-                memory_summary(),
-
-                "\nPESAN FADLI:\n",
-
-                text
-            ],
-
-            config=config
-        )
-
-        answer = getattr(
-            response,
-            "text",
-            None
-        )
-
-        if not answer:
-
-            raise Exception(
-                "GEMINI_EMPTY"
-            )
-
-        return answer.strip()
-
-    except Exception as error:
-
-        if is_gemini_limit(error):
-
-            print(
-                "Gemini quota/limit → fallback"
-            )
-
-        else:
-
-            print(
-                "Gemini error → fallback"
-            )
-
-        raise
 
 
 # =========================================================
@@ -471,16 +231,13 @@ def ask_groq(text):
 
     if not GROQ_API_KEY:
 
-        raise Exception(
-            "GROQ_UNAVAILABLE"
-        )
+        raise Exception("GROQ_NOT_CONFIGURED")
 
     response = requests.post(
 
         "https://api.groq.com/openai/v1/chat/completions",
 
         headers={
-
             "Authorization":
                 f"Bearer {GROQ_API_KEY}",
 
@@ -526,29 +283,16 @@ def ask_groq(text):
 
     if response.status_code != 200:
 
-        print(
-            "Groq HTTP:",
-            response.status_code
-        )
-
         raise Exception(
-            "GROQ_FAILED"
+            f"GROQ_HTTP_{response.status_code}"
         )
 
     data = response.json()
 
-    try:
-
-        answer = (
-            data["choices"][0]
-            ["message"]["content"]
-        )
-
-    except Exception:
-
-        raise Exception(
-            "GROQ_EMPTY"
-        )
+    answer = (
+        data["choices"][0]
+        ["message"]["content"]
+    )
 
     if not answer:
 
@@ -568,7 +312,7 @@ def ask_openrouter(text):
     if not OPENROUTER_API_KEY:
 
         raise Exception(
-            "OPENROUTER_UNAVAILABLE"
+            "OPENROUTER_NOT_CONFIGURED"
         )
 
     response = requests.post(
@@ -587,7 +331,7 @@ def ask_openrouter(text):
                 "https://github.com",
 
             "X-Title":
-                "Fadli AI Assistant"
+                "Fadli AI"
         },
 
         json={
@@ -628,29 +372,16 @@ def ask_openrouter(text):
 
     if response.status_code != 200:
 
-        print(
-            "OpenRouter HTTP:",
-            response.status_code
-        )
-
         raise Exception(
-            "OPENROUTER_FAILED"
+            f"OPENROUTER_HTTP_{response.status_code}"
         )
 
     data = response.json()
 
-    try:
-
-        answer = (
-            data["choices"][0]
-            ["message"]["content"]
-        )
-
-    except Exception:
-
-        raise Exception(
-            "OPENROUTER_EMPTY"
-        )
+    answer = (
+        data["choices"][0]
+        ["message"]["content"]
+    )
 
     if not answer:
 
@@ -662,102 +393,121 @@ def ask_openrouter(text):
 
 
 # =========================================================
+# GEMINI
+# =========================================================
+
+def ask_gemini(text):
+
+    if not gemini:
+
+        raise Exception(
+            "GEMINI_NOT_CONFIGURED"
+        )
+
+    response = gemini.models.generate_content(
+
+        model="gemini-3.1-flash-lite",
+
+        contents=[
+
+            SYSTEM_PROMPT,
+
+            memory_summary(),
+
+            "\nPESAN FADLI:\n",
+
+            text
+        ]
+    )
+
+    answer = getattr(
+        response,
+        "text",
+        None
+    )
+
+    if not answer:
+
+        raise Exception(
+            "GEMINI_EMPTY"
+        )
+
+    return answer.strip()
+
+
+# =========================================================
 # AI ROUTER
 # =========================================================
 
-def ask_ai(
-    text,
-    search=False
-):
+def ask_ai(text):
 
-    # =====================================================
-    # GEMINI
-    # =====================================================
+    # -----------------------------------------------------
+    # 1. GROQ
+    # -----------------------------------------------------
 
     try:
 
-        print(
-            "AI → Gemini"
-        )
+        print("AI → GROQ")
 
-        answer = ask_gemini(
-            text,
-            search=search
-        )
+        answer = ask_groq(text)
 
-        return (
-            answer,
-            "Gemini"
-        )
+        return answer, "Groq"
 
-    except Exception:
+    except Exception as error:
 
         print(
-            "Gemini → fallback"
+            "Groq failed:",
+            repr(error)
         )
 
 
-    # =====================================================
-    # GROQ
-    # =====================================================
+    # -----------------------------------------------------
+    # 2. OPENROUTER
+    # -----------------------------------------------------
 
     try:
 
-        print(
-            "AI → Groq"
-        )
+        print("AI → OPENROUTER")
 
-        answer = ask_groq(
-            text
-        )
+        answer = ask_openrouter(text)
 
-        return (
-            answer,
-            "Groq"
-        )
+        return answer, "OpenRouter"
 
-    except Exception:
+    except Exception as error:
 
         print(
-            "Groq → fallback"
+            "OpenRouter failed:",
+            repr(error)
         )
 
 
-    # =====================================================
-    # OPENROUTER
-    # =====================================================
+    # -----------------------------------------------------
+    # 3. GEMINI
+    # -----------------------------------------------------
 
     try:
 
-        print(
-            "AI → OpenRouter"
-        )
+        print("AI → GEMINI")
 
-        answer = ask_openrouter(
-            text
-        )
+        answer = ask_gemini(text)
 
-        return (
-            answer,
-            "OpenRouter"
-        )
+        return answer, "Gemini"
 
-    except Exception:
+    except Exception as error:
 
         print(
-            "OpenRouter → failed"
+            "Gemini failed:",
+            repr(error)
         )
 
 
-    # =====================================================
-    # ALL FAILED
-    # =====================================================
+    # -----------------------------------------------------
+    # SEMUA GAGAL
+    # -----------------------------------------------------
 
     return (
-
-        "⚠️ Maaf, semua AI sedang tidak tersedia "
-        "untuk sementara. Coba lagi beberapa saat.",
-
+        "Maaf, layanan AI sedang tidak tersedia "
+        "untuk sementara. Silakan coba lagi.",
         "System"
     )
 
@@ -766,17 +516,15 @@ def ask_ai(
 # FOOTER
 # =========================================================
 
-def add_ai_footer(
+def add_footer(
     answer,
     ai_name
 ):
 
     return (
-
         answer.strip()
-
-        + "\n\n———\n"
-
+        + "\n\n"
+        + "———\n"
         + f"🤖 Fadli AI • {ai_name}"
     )
 
@@ -790,55 +538,37 @@ def send_message(
     text
 ):
 
-    max_length = 4000
+    # Telegram maksimum sekitar 4096 karakter.
 
-    while len(text) > max_length:
+    chunks = []
+
+    while len(text) > 4000:
 
         split_at = text.rfind(
             "\n",
             0,
-            max_length
+            4000
         )
 
         if split_at <= 0:
 
-            split_at = max_length
+            split_at = 4000
 
-        part = text[
-            :split_at
-        ]
+        chunks.append(
+            text[:split_at]
+        )
 
         text = text[
             split_at:
         ]
 
-        try:
-
-            requests.post(
-
-                f"{TELEGRAM_URL}/sendMessage",
-
-                data={
-
-                    "chat_id":
-                        chat_id,
-
-                    "text":
-                        part
-                },
-
-                timeout=30
-            )
-
-        except Exception as error:
-
-            print(
-                "Telegram send error:",
-                error
-            )
-
     if text:
 
+        chunks.append(text)
+
+
+    for chunk in chunks:
+
         try:
 
             requests.post(
@@ -851,7 +581,7 @@ def send_message(
                         chat_id,
 
                     "text":
-                        text
+                        chunk
                 },
 
                 timeout=30
@@ -860,70 +590,19 @@ def send_message(
         except Exception as error:
 
             print(
-                "Telegram send error:",
-                error
+                "Telegram error:",
+                repr(error)
             )
 
 
 # =========================================================
-# MEMORY SCORE
+# TELEGRAM UPDATES
 # =========================================================
 
-def add_score(value):
-
-    memory = load_memory()
-
-    scores = memory.setdefault(
-        "scores",
-        []
-    )
-
-    scores.append(value)
-
-    memory["scores"] = scores[
-        -100:
-    ]
-
-    save_memory(
-        memory
-    )
-
-
-# =========================================================
-# MEMORY FEEDBACK
-# =========================================================
-
-def add_feedback(value):
-
-    memory = load_memory()
-
-    feedback = memory.setdefault(
-        "feedback",
-        []
-    )
-
-    feedback.append(value)
-
-    memory["feedback"] = feedback[
-        -100:
-    ]
-
-    save_memory(
-        memory
-    )
-
-
-# =========================================================
-# TELEGRAM GET UPDATES
-# =========================================================
-
-def get_updates(
-    offset=None
-):
+def get_updates(offset=None):
 
     params = {
-        "timeout":
-            30
+        "timeout": 30
     }
 
     if offset is not None:
@@ -945,32 +624,208 @@ def get_updates(
 
 
 # =========================================================
-# BOT
+# COMMANDS
+# =========================================================
+
+def process_command(
+    chat_id,
+    text
+):
+
+    lower = text.lower().strip()
+
+
+    # -----------------------------------------------------
+    # START
+    # -----------------------------------------------------
+
+    if lower == "/start":
+
+        send_message(
+
+            chat_id,
+
+            """🤖 FADLI AI
+
+Saya siap menjadi partner berpikir Anda.
+
+🔥 Tren & viral
+🎬 Script konten
+💡 Ide konten
+🧠 Brainstorming
+📊 Scoring tren
+💼 Marketing
+🤖 AI & teknologi
+
+Langsung kirim pesan seperti biasa."""
+        )
+
+        return True
+
+
+    # -----------------------------------------------------
+    # PING
+    # -----------------------------------------------------
+
+    if lower == "/ping":
+
+        send_message(
+
+            chat_id,
+
+            "🟢 Fadli AI online 24/7\n\n"
+            "———\n"
+            "🤖 Fadli AI • System"
+        )
+
+        return True
+
+
+    # -----------------------------------------------------
+    # MEMORY
+    # -----------------------------------------------------
+
+    if lower == "/memory":
+
+        memory = load_memory()
+
+        send_message(
+
+            chat_id,
+
+            json.dumps(
+                memory,
+                ensure_ascii=False,
+                indent=2
+            )
+
+            + "\n\n———\n"
+            "🤖 Fadli AI • System"
+        )
+
+        return True
+
+
+    # -----------------------------------------------------
+    # SCORE
+    # -----------------------------------------------------
+
+    if lower.startswith("/score"):
+
+        value = text[
+            len("/score"):
+        ].strip()
+
+        if value:
+
+            memory = load_memory()
+
+            memory.setdefault(
+                "scores",
+                []
+            ).append(value)
+
+            memory["scores"] = (
+                memory["scores"][-100:]
+            )
+
+            save_memory(memory)
+
+            send_message(
+
+                chat_id,
+
+                "📊 Score disimpan."
+
+                + "\n\n———\n"
+                "🤖 Fadli AI • System"
+            )
+
+        else:
+
+            send_message(
+
+                chat_id,
+
+                "Contoh:\n"
+                "/score ekonomi 9\n"
+                "/score AI 8\n"
+                "/score parenting 7"
+
+                + "\n\n———\n"
+                "🤖 Fadli AI • System"
+            )
+
+        return True
+
+
+    # -----------------------------------------------------
+    # FEEDBACK
+    # -----------------------------------------------------
+
+    if lower.startswith(
+        "/feedback"
+    ):
+
+        value = text[
+            len("/feedback"):
+        ].strip()
+
+        if value:
+
+            memory = load_memory()
+
+            memory.setdefault(
+                "feedback",
+                []
+            ).append(value)
+
+            memory["feedback"] = (
+                memory["feedback"][-100:]
+            )
+
+            save_memory(memory)
+
+            send_message(
+
+                chat_id,
+
+                "🧠 Feedback disimpan."
+
+                + "\n\n———\n"
+                "🤖 Fadli AI • System"
+            )
+
+        return True
+
+
+    return False
+
+
+# =========================================================
+# MAIN BOT
 # =========================================================
 
 def run_bot():
 
     print(
-        "===================================="
+        "================================="
     )
 
     print(
-        "FADLI AI ASSISTANT"
+        "FADLI AI TELEGRAM 24/7"
     )
 
     print(
-        "Telegram 24/7"
+        "Groq → OpenRouter → Gemini"
     )
 
     print(
-        "Gemini → Groq → OpenRouter"
-    )
-
-    print(
-        "===================================="
+        "================================="
     )
 
     offset = None
+
 
     while True:
 
@@ -1010,253 +865,48 @@ def run_bot():
                     message["chat"]["id"]
                 )
 
-                # =================================================
-                # SECURITY
-                # =================================================
+
+                # -------------------------------------------------
+                # ONLY FADLI
+                # -------------------------------------------------
 
                 if chat_id != CHAT_ID:
 
                     continue
 
-                lower = (
-                    text
-                    .lower()
-                    .strip()
-                )
 
                 print(
-                    "MESSAGE:",
+                    "Pesan:",
                     text
                 )
 
 
-                # =================================================
-                # /START
-                # =================================================
+                # -------------------------------------------------
+                # COMMAND
+                # -------------------------------------------------
 
-                if lower == "/start":
-
-                    send_message(
-
-                        chat_id,
-
-                        """🤖 FADLI AI
-
-Saya siap menjadi partner Anda.
-
-🎯 Personal branding
-🔥 Tren & viral
-🎬 Script konten
-💡 Ide konten
-🧠 Brainstorming
-📱 TikTok / Reels
-📊 Scoring tren
-💼 Marketing
-🤖 AI & teknologi
-
-Perintah:
-
-/ping
-/memory
-/score
-/feedback
-
-Atau langsung ngobrol seperti biasa."""
-                    )
-
-                    continue
-
-
-                # =================================================
-                # /PING
-                # =================================================
-
-                if lower == "/ping":
-
-                    send_message(
-
-                        chat_id,
-
-                        "🟢 Fadli AI online 24/7."
-                        "\n\n———\n"
-                        "🤖 Fadli AI • System"
-                    )
-
-                    continue
-
-
-                # =================================================
-                # /MEMORY
-                # =================================================
-
-                if lower == "/memory":
-
-                    memory = load_memory()
-
-                    send_message(
-
-                        chat_id,
-
-                        json.dumps(
-
-                            memory,
-
-                            ensure_ascii=False,
-
-                            indent=2
-                        )
-
-                        + "\n\n———\n"
-                        "🤖 Fadli AI • System"
-                    )
-
-                    continue
-
-
-                # =================================================
-                # /SCORE
-                # =================================================
-
-                if lower.startswith(
-                    "/score"
+                if process_command(
+                    chat_id,
+                    text
                 ):
 
-                    value = text[
-                        len("/score"):
-                    ].strip()
-
-                    if not value:
-
-                        send_message(
-
-                            chat_id,
-
-                            "Contoh:\n\n"
-                            "/score ekonomi 9\n"
-                            "/score AI 8\n"
-                            "/score parenting 7\n\n"
-                            "———\n"
-                            "🤖 Fadli AI • System"
-                        )
-
-                        continue
-
-                    add_score(
-                        value
-                    )
-
-                    send_message(
-
-                        chat_id,
-
-                        "📊 Score berhasil "
-                        "disimpan ke memory."
-
-                        + "\n\n———\n"
-                        "🤖 Fadli AI • System"
-                    )
-
                     continue
 
 
-                # =================================================
-                # /FEEDBACK
-                # =================================================
-
-                if lower.startswith(
-                    "/feedback"
-                ):
-
-                    value = text[
-                        len("/feedback"):
-                    ].strip()
-
-                    if not value:
-
-                        send_message(
-
-                            chat_id,
-
-                            "Contoh:\n\n"
-                            "/feedback saya suka "
-                            "konten ekonomi keluarga.\n\n"
-                            "———\n"
-                            "🤖 Fadli AI • System"
-                        )
-
-                        continue
-
-                    add_feedback(
-                        value
-                    )
-
-                    send_message(
-
-                        chat_id,
-
-                        "🧠 Feedback berhasil "
-                        "disimpan."
-
-                        + "\n\n———\n"
-                        "🤖 Fadli AI • System"
-                    )
-
-                    continue
-
-
-                # =================================================
-                # SEARCH DETECTION
-                # =================================================
-
-                search_words = [
-
-                    "viral",
-                    "tren",
-                    "trend",
-                    "terbaru",
-                    "hari ini",
-                    "sekarang",
-                    "ramai",
-                    "hype",
-                    "berita",
-                    "tiktok terbaru",
-                    "instagram terbaru",
-                    "youtube terbaru"
-                ]
-
-                search = any(
-
-                    word in lower
-
-                    for word in search_words
-                )
-
-
-                # =================================================
+                # -------------------------------------------------
                 # AI
-                # =================================================
-
-                # TIDAK ADA:
-                #
-                # "Sedang berpikir..."
-                #
-                # Semua AI bekerja di belakang layar.
-                #
-                # User hanya menerima hasil final.
+                # -------------------------------------------------
 
                 answer, ai_name = ask_ai(
-
-                    text,
-
-                    search=search
+                    text
                 )
 
 
-                # =================================================
-                # FOOTER
-                # =================================================
+                # -------------------------------------------------
+                # FINAL MESSAGE
+                # -------------------------------------------------
 
-                final_message = add_ai_footer(
+                final_message = add_footer(
 
                     answer,
 
@@ -1264,9 +914,9 @@ Atau langsung ngobrol seperti biasa."""
                 )
 
 
-                # =================================================
-                # SEND
-                # =================================================
+                # -------------------------------------------------
+                # SEND ONLY FINAL
+                # -------------------------------------------------
 
                 send_message(
 
@@ -1276,24 +926,13 @@ Atau langsung ngobrol seperti biasa."""
                 )
 
 
-        except KeyboardInterrupt:
-
-            print(
-                "Bot dihentikan."
-            )
-
-            break
-
-
         except Exception as error:
 
-            # =================================================
-            # PENTING:
-            # INTERNAL ERROR TIDAK DIKIRIM KE TELEGRAM
-            # =================================================
+            # INTERNAL ERROR HANYA DI LOG.
+            # TIDAK DIKIRIM KE TELEGRAM.
 
             print(
-                "BOT INTERNAL ERROR:",
+                "BOT ERROR:",
                 repr(error)
             )
 
@@ -1301,7 +940,7 @@ Atau langsung ngobrol seperti biasa."""
 
 
 # =========================================================
-# MAIN
+# START
 # =========================================================
 
 if __name__ == "__main__":
