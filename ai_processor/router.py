@@ -5,7 +5,7 @@ from .gemini import ask_gemini
 from .groq import ask_groq
 from .openrouter import ask_openrouter
 
-
+# Urutan default: OpenAI utama, lalu Gemini, Groq, dan OpenRouter sebagai fallback terakhir.
 PROVIDERS = {
     "openai": ("OpenAI", ask_openai),
     "gemini": ("Gemini", ask_gemini),
@@ -15,12 +15,11 @@ PROVIDERS = {
 
 
 def ask_ai(system_prompt, user_text):
-
     order = [
         p.strip().lower()
         for p in os.getenv(
             "AI_PROVIDER_ORDER",
-            "openai,gemini,groq,openrouter"
+            "openai,gemini,groq,openrouter",
         ).split(",")
         if p.strip()
     ]
@@ -28,7 +27,6 @@ def ask_ai(system_prompt, user_text):
     errors = []
 
     for key in order:
-
         if key not in PROVIDERS:
             continue
 
@@ -36,27 +34,13 @@ def ask_ai(system_prompt, user_text):
 
         try:
             print(f"TEXT AI -> {name}")
-
-            answer = fn(
-                system_prompt,
-                user_text
-            )
-
+            answer = fn(system_prompt, user_text)
             if answer:
                 return answer.strip(), name
-
         except Exception as exc:
-
-            errors.append(
-                f"{name}: {exc!r}"
-            )
-
-            print(
-                f"{name} failed:",
-                repr(exc)
-            )
+            errors.append(f"{name}: {exc!r}")
+            print(f"{name} failed: {exc!r}")
 
     raise RuntimeError(
-        "Semua AI provider gagal. "
-        + " | ".join(errors[-4:])
+        "Semua AI provider gagal. " + " | ".join(errors[-4:])
     )
