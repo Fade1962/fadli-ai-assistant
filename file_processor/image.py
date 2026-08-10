@@ -2,38 +2,51 @@ import os
 
 from PIL import Image
 
-import pytesseract
+from ai_processor.vision import analyze_image
 
 
-def process_image(filename):
+SUPPORTED_IMAGES = (
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".webp"
+)
+
+
+def process_image(
+    filename,
+    prompt=None
+):
+
+    extension = os.path.splitext(
+        filename
+    )[1].lower()
+
+    if extension not in SUPPORTED_IMAGES:
+
+        raise Exception(
+            "IMAGE_FORMAT_NOT_SUPPORTED"
+        )
 
     try:
 
-        image = Image.open(filename)
-
-        image = image.convert("RGB")
-
-        text = pytesseract.image_to_string(
-            image
+        # Pastikan file benar-benar gambar
+        image = Image.open(
+            filename
         )
 
-        text = text.strip()
+        image.verify()
 
-
-        if text:
-
-            return (
-                "HASIL OCR GAMBAR:\n\n"
-                + text
-            )
-
+        answer, ai_name = analyze_image(
+            filename,
+            prompt
+        )
 
         return (
-            "Gambar berhasil dibaca, "
-            "tetapi tidak ditemukan teks "
-            "yang dapat diekstrak."
+            answer
+            + "\n\n———\n"
+            + f"👁️ Vision • {ai_name}"
         )
-
 
     except Exception as error:
 
