@@ -3,4 +3,8 @@ __pycache__/
 *.pyc
 data/
 *.db
+*.sqlite
+*.sqlite3
 .DS_Store
+personal_profile.json
+PERSONAL_PROFILE_SECRET*
