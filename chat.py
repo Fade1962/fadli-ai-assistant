@@ -12,26 +12,9 @@ from file_processor.router import process_file
 from output_processor.router import create_file
 
 
+
 # =========================================================
 # FADLI AI ASSISTANT
-#
-# SUPPORT:
-#
-# TEXT
-# IMAGE
-# PDF
-# DOCX
-# XLSX
-# PPTX
-#
-# OUTPUT:
-#
-# PDF
-# DOCX
-# XLSX
-# PPTX
-#
-# AI ROUTER:
 #
 # TEXT:
 # Groq
@@ -40,11 +23,16 @@ from output_processor.router import create_file
 # Gemini
 #
 # IMAGE:
-# OpenAI Vision
-# Gemini Vision
-# OpenRouter Vision
+# Vision AI
+#
+# FILE:
+# PDF
+# DOCX
+# XLSX
+# PPTX
 #
 # =========================================================
+
 
 
 # =========================================================
@@ -138,23 +126,17 @@ ATURAN:
 
 Jika ide Fadli kurang bagus:
 
-jelaskan alasannya.
+Jelaskan alasannya.
 
 Berikan alternatif.
 
 
-Jika membuat script:
-
-Gunakan:
+Jika membuat script gunakan:
 
 HOOK
-
 STORY
-
 INSIGHT
-
 ENDING
-
 CTA
 
 
@@ -165,10 +147,7 @@ Jangan:
 - membuat Fadli terlihat kaya
 - menjadi motivator kosong
 
-
 """
-
-
 
 # =========================================================
 # MEMORY
@@ -268,8 +247,9 @@ FEEDBACK:
 
 {memory.get("feedback", [])[-20:]}
 
-
 """
+
+
 
 # =========================================================
 # TELEGRAM SEND TEXT
@@ -282,16 +262,20 @@ def telegram_send(
 ):
 
     if not text:
+
         return
 
 
+
     max_length = 4000
+
 
 
     while text:
 
 
         chunk = text[:max_length]
+
 
 
         if len(text) > max_length:
@@ -309,28 +293,23 @@ def telegram_send(
         text = text[len(chunk):]
 
 
+
         try:
 
 
             response = requests.post(
 
-
                 f"{TELEGRAM_URL}/sendMessage",
-
 
                 data={
 
-                    "chat_id":
-                    chat_id,
+                    "chat_id": chat_id,
 
-                    "text":
-                    chunk
+                    "text": chunk
 
                 },
 
-
                 timeout=30
-
 
             )
 
@@ -349,6 +328,7 @@ def telegram_send(
                 repr(error)
 
             )
+
 
 
 
@@ -380,42 +360,32 @@ def telegram_send_file(
         ) as file:
 
 
-
             response = requests.post(
-
 
                 f"{TELEGRAM_URL}/sendDocument",
 
-
                 data={
 
-                    "chat_id":
-                    chat_id,
+                    "chat_id": chat_id,
 
-
-                    "caption":
-                    caption
+                    "caption": caption
 
                 },
 
 
                 files={
 
-                    "document":
-                    file
+                    "document": file
 
                 },
 
 
                 timeout=120
 
-
             )
 
 
-
         response.raise_for_status()
-
 
 
         return True
@@ -427,7 +397,7 @@ def telegram_send_file(
 
         print(
 
-            "FILE SEND ERROR:",
+            "TELEGRAM FILE ERROR:",
 
             repr(error)
 
@@ -435,10 +405,6 @@ def telegram_send_file(
 
 
         return False
-
-
-
-
 
 # =========================================================
 # DOWNLOAD TELEGRAM FILE
@@ -449,33 +415,25 @@ def download_telegram_file(
     file_id
 ):
 
-
     try:
 
 
         response = requests.get(
 
-
             f"{TELEGRAM_URL}/getFile",
-
 
             params={
 
-                "file_id":
-                file_id
+                "file_id": file_id
 
             },
 
-
             timeout=30
-
 
         )
 
 
-
         response.raise_for_status()
-
 
 
         data = response.json()
@@ -506,15 +464,11 @@ def download_telegram_file(
 
         file_response = requests.get(
 
-
             download_url,
-
 
             timeout=120
 
-
         )
-
 
 
         file_response.raise_for_status()
@@ -570,6 +524,17 @@ def download_telegram_file(
 
 # =========================================================
 # PROCESS TELEGRAM FILE
+#
+# IMAGE:
+# PNG JPG JPEG WEBP
+#       ↓
+# Vision AI
+#
+# DOCUMENT:
+# PDF DOCX XLSX PPTX
+#       ↓
+# File Processor
+#
 # =========================================================
 
 
@@ -583,13 +548,12 @@ def process_telegram_file(
 
 
 
-    # ==========================
+    # =====================================================
     # DOCUMENT
-    # ==========================
+    # =====================================================
 
 
     if message.get("document"):
-
 
 
         telegram_send(
@@ -597,14 +561,12 @@ def process_telegram_file(
             chat_id,
 
             "📂 File diterima.\n\n"
-            "🔎 Sedang membaca file..."
+            "🔎 Membaca isi file..."
 
         )
 
 
-
         document = message["document"]
-
 
 
         file_id = document.get(
@@ -612,7 +574,6 @@ def process_telegram_file(
             "file_id"
 
         )
-
 
 
         filename = download_telegram_file(
@@ -624,13 +585,12 @@ def process_telegram_file(
 
 
 
-    # ==========================
-    # PHOTO / PNG / JPG
-    # ==========================
+    # =====================================================
+    # IMAGE
+    # =====================================================
 
 
     elif message.get("photo"):
-
 
 
         telegram_send(
@@ -638,10 +598,9 @@ def process_telegram_file(
             chat_id,
 
             "🖼️ Gambar diterima.\n\n"
-            "🤖 Sedang menganalisa gambar..."
+            "🤖 Menganalisa gambar..."
 
         )
-
 
 
         photo = message["photo"]
@@ -655,12 +614,12 @@ def process_telegram_file(
         )
 
 
-
         filename = download_telegram_file(
 
             file_id
 
         )
+
 
 
 
@@ -673,22 +632,31 @@ def process_telegram_file(
 
 
 
+
     try:
 
 
-        extension = filename.lower()
+        file_lower = filename.lower()
 
 
 
-        # IMAGE
+        # ===============================
+        # IMAGE ROUTE
+        # ===============================
 
-        if extension.endswith(
+
+        if file_lower.endswith(
 
             (
+
                 ".png",
+
                 ".jpg",
+
                 ".jpeg",
+
                 ".webp"
+
             )
 
         ):
@@ -701,6 +669,11 @@ def process_telegram_file(
 
             )
 
+
+
+        # ===============================
+        # DOCUMENT ROUTE
+        # ===============================
 
 
         else:
@@ -731,13 +704,13 @@ def process_telegram_file(
         )
 
 
-
         return (
 
-            "File berhasil diterima, "
-            "tetapi gagal dianalisa."
+            "File diterima, "
+            "tetapi gagal diproses."
 
         )
+
 
 
 
@@ -746,7 +719,6 @@ def process_telegram_file(
 
         try:
 
-
             os.remove(
 
                 filename
@@ -754,8 +726,7 @@ def process_telegram_file(
             )
 
 
-        except:
-
+        except Exception:
 
             pass
 
@@ -768,48 +739,70 @@ def detect_output_request(
     text
 ):
 
+
     text = text.lower()
 
 
 
     if (
+
         "buat pdf" in text
+
         or "jadikan pdf" in text
+
         or "export pdf" in text
+
     ):
 
         return "pdf"
 
 
 
+
     if (
+
         "buat word" in text
+
         or "buat docx" in text
+
         or "dokumen word" in text
+
     ):
 
         return "docx"
 
 
 
+
     if (
+
         "buat excel" in text
+
         or "buat xlsx" in text
+
         or "spreadsheet" in text
+
     ):
 
         return "xlsx"
 
 
 
+
     if (
+
         "buat powerpoint" in text
+
         or "buat ppt" in text
+
         or "buat pptx" in text
+
         or "presentasi" in text
+
     ):
 
         return "pptx"
+
 
 
 
@@ -820,7 +813,10 @@ def detect_output_request(
 
 
 # =========================================================
-# HANDLE AI REQUEST
+# HANDLE AI TEXT REQUEST
+#
+# HANYA UNTUK TEXT
+#
 # =========================================================
 
 
@@ -842,7 +838,7 @@ def handle_ai_request(
 
         SYSTEM_PROMPT
 
-        + "\n"
+        + "\n\n"
 
         + memory_summary()
 
@@ -851,7 +847,6 @@ def handle_ai_request(
 
 
     try:
-
 
 
         answer, ai_name = ask_ai(
@@ -867,14 +862,14 @@ def handle_ai_request(
     except Exception as error:
 
 
-
         print(
 
-            "AI ERROR:",
+            "AI REQUEST ERROR:",
 
             repr(error)
 
         )
+
 
 
         telegram_send(
@@ -893,16 +888,14 @@ def handle_ai_request(
 
 
     # =====================================================
-    # CREATE FILE OUTPUT
+    # CREATE OUTPUT FILE
     # =====================================================
 
 
     if output_type:
 
 
-
         try:
-
 
 
             filename = create_file(
@@ -947,7 +940,7 @@ def handle_ai_request(
                     )
 
 
-                except:
+                except Exception:
 
 
                     pass
@@ -962,10 +955,9 @@ def handle_ai_request(
         except Exception as error:
 
 
-
             print(
 
-                "CREATE FILE ERROR:",
+                "OUTPUT CREATE ERROR:",
 
                 repr(error)
 
@@ -975,31 +967,26 @@ def handle_ai_request(
 
 
 
-
     # =====================================================
-    # NORMAL TEXT
+    # NORMAL TEXT RESPONSE
     # =====================================================
-
 
 
     telegram_send(
 
         chat_id,
 
-        answer
+        (
 
-        + "\n\n"
+            answer
 
-        "────────────\n"
+            + "\n\n────────────\n"
 
-        f"🤖 Fadli AI • {ai_name}"
+            + f"🤖 Fadli AI • {ai_name}"
+
+        )
 
     )
-
-
-
-
-
 
 # =========================================================
 # COMMAND HANDLER
@@ -1016,9 +1003,10 @@ def handle_command(
 
 
 
-    # =====================
+
+    # =====================================================
     # START
-    # =====================
+    # =====================================================
 
 
     if command == "/start":
@@ -1026,18 +1014,18 @@ def handle_command(
 
         telegram_send(
 
-
             chat_id,
 
 
             """
-🤖 FADLI AI
+🤖 FADLI AI ASSISTANT
 
 
 Aktif.
 
 
 Kemampuan:
+
 
 💬 Chat AI
 
@@ -1053,6 +1041,7 @@ Kemampuan:
 
 
 Output:
+
 
 📄 PDF
 
@@ -1075,9 +1064,9 @@ Kirim pesan atau file.
 
 
 
-    # =====================
+    # =====================================================
     # PING
-    # =====================
+    # =====================================================
 
 
     if command == "/ping":
@@ -1098,9 +1087,9 @@ Kirim pesan atau file.
 
 
 
-    # =====================
+    # =====================================================
     # MEMORY
-    # =====================
+    # =====================================================
 
 
     if command == "/memory":
@@ -1129,10 +1118,9 @@ Kirim pesan atau file.
 
 
 
-
-    # =====================
+    # =====================================================
     # FEEDBACK
-    # =====================
+    # =====================================================
 
 
     if command.startswith(
@@ -1142,6 +1130,7 @@ Kirim pesan atau file.
     ):
 
 
+
         value = text.replace(
 
             "/feedback",
@@ -1149,6 +1138,25 @@ Kirim pesan atau file.
             ""
 
         ).strip()
+
+
+
+
+        if not value:
+
+
+            telegram_send(
+
+                chat_id,
+
+                "Gunakan:\n/feedback isi feedback"
+
+            )
+
+
+            return True
+
+
 
 
 
@@ -1178,6 +1186,7 @@ Kirim pesan atau file.
 
 
 
+
         telegram_send(
 
             chat_id,
@@ -1185,7 +1194,6 @@ Kirim pesan atau file.
             "🧠 Feedback tersimpan."
 
         )
-
 
 
         return True
@@ -1214,20 +1222,17 @@ def get_updates(
 
         params={
 
-            "offset":
-            offset,
+            "offset": offset,
 
-
-            "timeout":
-            30
+            "timeout": 30
 
         },
 
 
         timeout=40
 
-
     )
+
 
 
     response.raise_for_status()
@@ -1235,7 +1240,6 @@ def get_updates(
 
 
     return response.json()
-
 
 
 
@@ -1272,7 +1276,7 @@ def run_bot():
 
     print(
 
-        "Vision Ready"
+        "Vision Routing Ready"
 
     )
 
@@ -1287,17 +1291,14 @@ def run_bot():
 
 
 
-    # Hapus webhook agar polling aktif
-
+    # hapus webhook
 
     try:
 
 
         requests.post(
 
-
             f"{TELEGRAM_URL}/deleteWebhook",
-
 
             params={
 
@@ -1307,9 +1308,7 @@ def run_bot():
 
             },
 
-
             timeout=30
-
 
         )
 
@@ -1324,7 +1323,6 @@ def run_bot():
             repr(error)
 
         )
-
 
 
 
@@ -1349,7 +1347,6 @@ def run_bot():
                 offset
 
             )
-
 
 
 
@@ -1386,12 +1383,10 @@ def run_bot():
 
 
 
-
                 if not message:
 
 
                     continue
-
 
 
 
@@ -1407,7 +1402,9 @@ def run_bot():
 
 
 
+                # =========================
                 # SECURITY
+                # =========================
 
 
                 if CHAT_ID and chat_id != CHAT_ID:
@@ -1451,8 +1448,9 @@ def run_bot():
 
 
 
-
+                # =========================
                 # COMMAND
+                # =========================
 
 
                 if text and handle_command(
@@ -1470,26 +1468,22 @@ def run_bot():
 
 
 
-
-
-                # =================================
-                # FILE / IMAGE INPUT
-                # =================================
-
+                # =========================
+                # IMAGE / DOCUMENT
+                # =========================
 
 
                 if (
 
-                    message.get("document")
+                    message.get("photo")
 
-                    or message.get("photo")
+                    or message.get("document")
 
                 ):
 
 
 
-
-                    extracted = process_telegram_file(
+                    result = process_telegram_file(
 
                         message,
 
@@ -1501,19 +1495,24 @@ def run_bot():
 
 
 
-                    if extracted:
+                    if result:
 
 
-
-                        handle_ai_request(
+                        telegram_send(
 
                             chat_id,
 
-                            extracted
+                            (
+
+                                result
+
+                                + "\n\n────────────\n"
+
+                                "🤖 Fadli AI Vision/File"
+
+                            )
 
                         )
-
-
 
 
 
@@ -1524,15 +1523,12 @@ def run_bot():
 
 
 
-
-                # =================================
-                # TEXT INPUT
-                # =================================
-
+                # =========================
+                # TEXT CHAT
+                # =========================
 
 
                 if text:
-
 
 
                     handle_ai_request(
@@ -1551,7 +1547,6 @@ def run_bot():
         except KeyboardInterrupt:
 
 
-
             print(
 
                 "BOT STOPPED"
@@ -1565,29 +1560,50 @@ def run_bot():
 
 
 
-
         except Exception as error:
 
 
 
             print(
 
-                "BOT ERROR:",
+                "BOT LOOP ERROR:",
 
                 repr(error)
 
             )
 
 
-
             time.sleep(5)
 
 # =========================================================
-# MAIN
+# START APPLICATION
 # =========================================================
 
 
 if __name__ == "__main__":
+
+
+    if not TELEGRAM_TOKEN:
+
+
+        print(
+
+            "ERROR: TELEGRAM_TOKEN belum diisi."
+
+        )
+
+
+        exit(1)
+
+
+
+
+    print(
+
+        "Starting Fadli AI..."
+
+    )
+
 
 
     run_bot()
