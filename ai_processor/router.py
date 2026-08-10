@@ -1,225 +1,46 @@
 import os
-import base64
-import requests
 
-
-from .openai import ask_openai
-from .gemini import ask_gemini
 from .groq import ask_groq
+from .openai import ask_openai
 from .openrouter import ask_openrouter
+from .gemini import ask_gemini
 
 
+def ask_ai(system_prompt, user_text):
 
-# =========================================================
-# AI ROUTER
-#
-# TEXT:
-# OpenAI
-# ↓
-# Gemini
-# ↓
-# Groq
-# ↓
-# OpenRouter
-#
-#
-# IMAGE:
-# OpenAI Vision
-# ↓
-# Gemini Vision
-#
-# =========================================================
+    prompt = f"""
+{system_prompt}
 
-
-
-def ask_ai(
-    prompt,
-    image_path=None
-):
-
-
-    # =========================================
-    # IMAGE MODE
-    # =========================================
-
-
-    if image_path:
-
-
-        providers = [
-
-
-            (
-                "OpenAI Vision",
-                ask_openai
-            ),
-
-
-            (
-                "Gemini Vision",
-                ask_gemini
-            )
-
-        ]
-
-
-
-        for name, function in providers:
-
-
-            try:
-
-
-                print(
-
-                    "VISION AI →",
-
-                    name
-
-                )
-
-
-                answer = function(
-
-                    prompt,
-
-                    image_path
-
-                )
-
-
-                return answer, name
-
-
-
-            except Exception as error:
-
-
-                print(
-
-                    name,
-
-                    "FAILED:",
-
-                    repr(error)
-
-                )
-
-
-                continue
-
-
-
-        return (
-
-            "Maaf gambar tidak dapat dianalisis.",
-
-            "System"
-
-        )
-
-
-
-
-
-    # =========================================
-    # TEXT MODE
-    # =========================================
-
+PESAN USER:
+{user_text}
+"""
 
     providers = [
-
-
-        (
-
-            "OpenAI",
-
-            ask_openai
-
-        ),
-
-
-        (
-
-            "Gemini",
-
-            ask_gemini
-
-        ),
-
-
-        (
-
-            "Groq",
-
-            ask_groq
-
-        ),
-
-
-        (
-
-            "OpenRouter",
-
-            ask_openrouter
-
-        )
-
-
+        ("Groq", ask_groq),
+        ("OpenAI", ask_openai),
+        ("OpenRouter", ask_openrouter),
+        ("Gemini", ask_gemini),
     ]
-
-
-
 
     for name, function in providers:
 
-
         try:
 
+            print(f"TEXT AI → {name}")
 
-            print(
+            answer = function(prompt)
 
-                "AI →",
-
-                name
-
-            )
-
-
-            answer = function(
-
-                prompt
-
-            )
-
-
-            return answer, name
-
-
+            if answer:
+                return answer.strip(), name
 
         except Exception as error:
 
-
             print(
-
-                name,
-
-                "FAILED:",
-
+                f"{name} gagal:",
                 repr(error)
-
             )
 
-
-            continue
-
-
-
-
     return (
-
-        "Semua AI gagal dipanggil.",
-
+        "Maaf, semua AI provider sedang tidak tersedia.",
         "System"
-
     )
