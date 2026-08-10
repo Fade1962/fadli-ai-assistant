@@ -40,7 +40,7 @@ def ask_gemini(system_prompt, user_text, use_search=False, deep=False):
     config = types.GenerateContentConfig(
         system_instruction=system_prompt,
         temperature=0.45,
-        max_output_tokens=3500,
+        max_output_tokens=(2800 if deep else 1200),
         thinking_config=types.ThinkingConfig(
             thinking_budget=thinking_budget,
             include_thoughts=False,
