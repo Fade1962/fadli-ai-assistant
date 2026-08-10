@@ -1,10 +1,7 @@
-name: NARA Daily Radar
+name: NARA Daily Radar - Manual Test
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 6 * * *"
-      timezone: "Asia/Makassar"
 
 jobs:
   scout:
@@ -15,6 +12,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Restore NARA memory
+        uses: actions/cache/restore@v4
+        with:
+          path: data
+          key: nara-data-manual-${{ github.run_id }}
+          restore-keys: |
+            nara-data-
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -23,7 +28,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run NARA Daily Radar
+      - name: Run NARA Daily Radar test
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
@@ -42,3 +47,10 @@ jobs:
           ALLOW_SENSITIVE_FALLBACK: "false"
 
         run: python scout_once.py
+
+      - name: Save NARA memory
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data
+          key: nara-data-manual-${{ github.run_id }}
