@@ -13,32 +13,26 @@ def ask_ai(
 
     providers = [
 
+    (
+        "OpenAI",
+        ask_openai
+    ),
 
-        (
-            "Groq",
-            ask_groq
-        ),
+    (
+        "Groq",
+        ask_groq
+    ),
 
+    (
+        "OpenRouter",
+        ask_openrouter
+    ),
 
-        (
-            "OpenAI",
-            ask_openai
-        ),
-
-
-        (
-            "OpenRouter",
-            ask_openrouter
-        ),
-
-
-        (
-            "Gemini",
-            ask_gemini
-        )
-
-    ]
-
+    (
+        "Gemini",
+        ask_gemini
+    )
+]
 
 
     for name, provider in providers:
