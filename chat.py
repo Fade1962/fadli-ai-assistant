@@ -3,15 +3,21 @@ import time
 import json
 import requests
 
+
+from ai_processor.router import ask_ai
 from file_processor.router import process_file
+from output_processor.router import create_file
+
 
 
 # =========================================================
-# FADLI AI CHAT
+# FADLI AI ASSISTANT
 #
-# PRIORITAS:
+# AI ROUTER:
 #
 # Groq
+# ↓
+# OpenAI
 # ↓
 # OpenRouter
 # ↓
@@ -23,19 +29,22 @@ from file_processor.router import process_file
 # - Image
 # - DOCX
 # - XLSX
-# - CSV
 # - PPTX
+# - Output File
 # =========================================================
+
 
 
 # =========================================================
 # ENV
 # =========================================================
 
+
 TELEGRAM_TOKEN = os.environ.get(
     "TELEGRAM_TOKEN",
     ""
 )
+
 
 CHAT_ID = str(
     os.environ.get(
@@ -45,125 +54,12 @@ CHAT_ID = str(
 )
 
 
-GROQ_API_KEY = os.environ.get(
-    "GROQ_API_KEY"
-)
-
-OPENROUTER_API_KEY = os.environ.get(
-    "OPENROUTER_API_KEY"
-)
-
-GEMINI_API_KEY = os.environ.get(
-    "GEMINI_API_KEY"
-)
-
-
 TELEGRAM_URL = (
     f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 )
 
 
 MEMORY_FILE = "memory.json"
-
-
-# =========================================================
-# MEMORY
-# =========================================================
-
-
-def load_memory():
-
-    try:
-
-        with open(
-            MEMORY_FILE,
-            "r",
-            encoding="utf-8"
-        ) as f:
-
-            return json.load(f)
-
-
-    except Exception:
-
-        return {
-
-            "scores": [],
-
-            "feedback": [],
-
-            "preferred_topics": [],
-
-            "avoided_topics": [],
-
-            "content_style": {}
-
-        }
-
-
-
-def save_memory(memory):
-
-    try:
-
-        with open(
-            MEMORY_FILE,
-            "w",
-            encoding="utf-8"
-        ) as f:
-
-            json.dump(
-                memory,
-                f,
-                ensure_ascii=False,
-                indent=2
-            )
-
-
-    except Exception as error:
-
-        print(
-            "MEMORY ERROR:",
-            repr(error)
-        )
-
-
-
-def memory_summary():
-
-    memory = load_memory()
-
-
-    return f"""
-
-MEMORY FADLI
-
-
-TOPIK DISUKAI:
-
-{memory.get("preferred_topics", [])}
-
-
-TOPIK DIHINDARI:
-
-{memory.get("avoided_topics", [])}
-
-
-SCORE TERBARU:
-
-{memory.get("scores", [])[-20:]}
-
-
-FEEDBACK TERBARU:
-
-{memory.get("feedback", [])[-20:]}
-
-
-GAYA KONTEN:
-
-{memory.get("content_style", {})}
-
-"""
 
 
 
@@ -178,81 +74,61 @@ Kamu adalah FADLI AI PERSONAL ASSISTANT.
 
 
 Kamu adalah partner berpikir Fadli,
-bukan chatbot generik.
+bukan chatbot biasa.
 
 
 IDENTITAS FADLI:
 
 - Suami
 - Bapak 2 anak
-- Pekerja
 - Marketing Communication
 - Designer
+- Digital Marketing
 - Social Media
 - Motion Graphic
-- Digital Marketing
-- Marketing otomotif
 - Belajar AI
 - Belajar teknologi
 
 
-PERSONAL BRANDING:
+PERSONAL BRAND:
 
-"Bapak 2 anak yang bekerja, belajar,
-dan berjuang memperbaiki kehidupan keluarga
-dengan skill, kreativitas, teknologi dan AI."
-
-
-Jangan menggambarkan Fadli sebagai:
-
-- orang kaya
-- motivator
-- financial guru
-- pengusaha sukses besar
-- pakar kehidupan
+"Bapak 2 anak yang bekerja,
+belajar teknologi,
+dan berusaha meningkatkan kehidupan keluarga
+dengan skill dan AI."
 
 
-GAYA:
+GAYA JAWABAN:
 
 - natural
-- jujur
 - realistis
-- sederhana
-- relatable
-- tidak menggurui
-- ringkas
+- jujur
 - praktis
+- tidak menggurui
+- tidak sok sukses
 
 
 TOPIK:
 
-- Ekonomi keluarga
-- Dunia kerja
-- Gaji
-- Side hustle
-- Parenting
+- ekonomi keluarga
+- pekerjaan
+- karir
+- bisnis kecil
 - AI
-- Teknologi
-- Digital marketing
-- Content creation
-- Social media
-- Marketing
-- Otomotif
+- teknologi
+- marketing
+- content creator
+- social media
+- otomotif
 
 
-Jika Fadli meminta pendapat:
+Jika ide Fadli kurang bagus:
 
-Berikan opini jujur.
-
-
-Jika ide Fadli lemah:
-
-- katakan lemah
-- jelaskan alasan
-- berikan alternatif
+jelaskan alasannya
+dan berikan alternatif.
 
 
-Jika meminta script:
+Jika membuat script:
 
 Gunakan:
 
@@ -264,21 +140,110 @@ CTA
 
 
 Jangan mengarang fakta.
-Jangan mengarang pengalaman Fadli.
 
-
-Tujuan:
-
-VIRAL
-+
-RELEVAN
-+
-MEMBANGUN PERSONAL BRANDING
+Jangan mengarang pengalaman pribadi Fadli.
 
 """
 
+
+
 # =========================================================
-# TELEGRAM SEND
+# MEMORY
+# =========================================================
+
+
+def load_memory():
+
+    try:
+
+        with open(
+
+            MEMORY_FILE,
+
+            "r",
+
+            encoding="utf-8"
+
+        ) as f:
+
+
+            return json.load(f)
+
+
+
+    except:
+
+
+        return {
+
+            "feedback": [],
+
+            "scores": []
+
+        }
+
+
+
+def save_memory(data):
+
+    try:
+
+        with open(
+
+            MEMORY_FILE,
+
+            "w",
+
+            encoding="utf-8"
+
+        ) as f:
+
+
+            json.dump(
+
+                data,
+
+                f,
+
+                ensure_ascii=False,
+
+                indent=2
+
+            )
+
+
+    except Exception as error:
+
+
+        print(
+
+            "MEMORY ERROR",
+
+            error
+
+        )
+
+
+
+def memory_summary():
+
+    memory = load_memory()
+
+
+    return f"""
+
+MEMORY FADLI
+
+Score:
+{memory.get("scores", [])[-20:]}
+
+
+Feedback:
+{memory.get("feedback", [])[-20:]}
+
+"""
+    # =========================================================
+# TELEGRAM SEND MESSAGE
 # =========================================================
 
 
@@ -291,38 +256,22 @@ def telegram_send(chat_id, text):
     max_length = 4000
 
 
-    chunks = []
+    while text:
+
+        chunk = text[:max_length]
 
 
-    while len(text) > max_length:
+        if len(text) > max_length:
 
-        split_at = text.rfind(
-            "\n",
-            0,
-            max_length
-        )
+            split_at = chunk.rfind("\n")
 
+            if split_at > 1000:
 
-        if split_at <= 0:
-
-            split_at = max_length
+                chunk = chunk[:split_at]
 
 
-        chunks.append(
-            text[:split_at]
-        )
+        text = text[len(chunk):]
 
-
-        text = text[split_at:]
-
-
-    if text:
-
-        chunks.append(text)
-
-
-
-    for chunk in chunks:
 
         try:
 
@@ -346,7 +295,6 @@ def telegram_send(chat_id, text):
             response.raise_for_status()
 
 
-
         except Exception as error:
 
             print(
@@ -358,8 +306,79 @@ def telegram_send(chat_id, text):
             )
 
 
+
 # =========================================================
-# TELEGRAM FILE DOWNLOAD
+# TELEGRAM SEND FILE
+# =========================================================
+
+
+def telegram_send_file(
+    chat_id,
+    filename,
+    caption=""
+):
+
+    if not filename:
+
+        return False
+
+
+    try:
+
+        with open(
+            filename,
+            "rb"
+        ) as file:
+
+            response = requests.post(
+
+                f"{TELEGRAM_URL}/sendDocument",
+
+                data={
+
+                    "chat_id":
+                    chat_id,
+
+                    "caption":
+                    caption
+
+                },
+
+                files={
+
+                    "document":
+                    file
+
+                },
+
+                timeout=120
+
+            )
+
+
+        response.raise_for_status()
+
+
+        return True
+
+
+    except Exception as error:
+
+        print(
+
+            "TELEGRAM FILE ERROR:",
+
+            repr(error)
+
+        )
+
+
+        return False
+
+
+
+# =========================================================
+# TELEGRAM GET FILE
 # =========================================================
 
 
@@ -373,7 +392,8 @@ def download_telegram_file(file_id):
 
             params={
 
-                "file_id": file_id
+                "file_id":
+                file_id
 
             },
 
@@ -382,39 +402,49 @@ def download_telegram_file(file_id):
         )
 
 
+        response.raise_for_status()
+
+
         data = response.json()
 
 
-        file_path = data["result"]["file_path"]
+        file_path = (
 
+            data["result"]
+
+            ["file_path"]
+
+        )
 
 
         download_url = (
 
             f"https://api.telegram.org/file/bot"
 
-            f"{TELEGRAM_TOKEN}/{file_path}"
+            f"{TELEGRAM_TOKEN}/"
+
+            f"{file_path}"
 
         )
-
 
 
         file_response = requests.get(
 
             download_url,
 
-            timeout=60
+            timeout=120
 
         )
 
 
+        file_response.raise_for_status()
 
-        filename = (
 
-            file_path.split("/")[-1]
+        filename = os.path.basename(
+
+            file_path
 
         )
-
 
 
         with open(
@@ -423,27 +453,24 @@ def download_telegram_file(file_id):
 
             "wb"
 
-        ) as f:
+        ) as file:
 
 
-            f.write(
+            file.write(
 
                 file_response.content
 
             )
 
 
-
         return filename
-
 
 
     except Exception as error:
 
-
         print(
 
-            "DOWNLOAD FILE ERROR:",
+            "DOWNLOAD ERROR:",
 
             repr(error)
 
@@ -454,420 +481,276 @@ def download_telegram_file(file_id):
 
 
 # =========================================================
-# GROQ
+# PROCESS INCOMING FILE
 # =========================================================
 
 
-def ask_groq(text):
+def process_telegram_file(
+    message,
+    chat_id
+):
+
+    filename = None
 
 
-    if not GROQ_API_KEY:
+    # -----------------------------------------------------
+    # DOCUMENT
+    # -----------------------------------------------------
 
-        raise Exception(
-            "GROQ_NOT_CONFIGURED"
+    if message.get("document"):
+
+        telegram_send(
+
+            chat_id,
+
+            "📂 File diterima.\n"
+            "🔎 Sedang membaca isi file..."
+
         )
 
 
-
-    response = requests.post(
-
-
-        "https://api.groq.com/openai/v1/chat/completions",
+        document = message["document"]
 
 
-        headers={
+        file_id = document.get(
+            "file_id"
+        )
 
 
-            "Authorization":
+        filename = download_telegram_file(
 
-                f"Bearer {GROQ_API_KEY}",
+            file_id
 
-
-
-            "Content-Type":
-
-                "application/json"
-
-        },
+        )
 
 
-        json={
+    # -----------------------------------------------------
+    # PHOTO
+    # -----------------------------------------------------
+
+    elif message.get("photo"):
+
+        telegram_send(
+
+            chat_id,
+
+            "🖼️ Gambar diterima.\n"
+            "🔎 Sedang menganalisis..."
+
+        )
 
 
-            "model":
-
-                "llama-3.3-70b-versatile",
+        photo = message["photo"]
 
 
-
-            "messages": [
-
-
-                {
+        file_id = photo[-1].get(
+            "file_id"
+        )
 
 
-                    "role":
+        filename = download_telegram_file(
 
-                        "system",
+            file_id
 
-
-
-                    "content":
-
-                        SYSTEM_PROMPT
-
-                        + "\n"
-
-                        + memory_summary()
-
-                },
+        )
 
 
-                {
+    if not filename:
+
+        return None
 
 
-                    "role":
+    try:
 
-                        "user",
+        result = process_file(
 
+            filename
 
-
-                    "content":
-
-                        text
-
-                }
-
-            ],
+        )
 
 
+        if not result:
 
-            "temperature":
+            result = (
 
-                0.7,
+                "File berhasil diterima, "
 
+                "tetapi tidak ada teks yang "
 
+                "berhasil diekstrak."
 
-            "max_tokens":
-
-                1800
-
-        },
-
+            )
 
 
-        timeout=45
+        return result
+
+
+    except Exception as error:
+
+        print(
+
+            "FILE PROCESS ERROR:",
+
+            repr(error)
+
+        )
+
+
+        return (
+
+            "File berhasil diterima, "
+
+            "tetapi terjadi masalah saat "
+
+            "membaca file."
+
+        )
+
+
+    finally:
+
+        try:
+
+            os.remove(
+
+                filename
+
+            )
+
+        except:
+
+            pass
+
+# =========================================================
+# OUTPUT FILE DETECTOR
+# =========================================================
+
+
+def detect_output_request(text):
+
+    text = text.lower()
+
+
+    if "buat pdf" in text or "jadikan pdf" in text:
+
+        return "pdf"
+
+
+    if "buat docx" in text or "word" in text:
+
+        return "docx"
+
+
+    if "buat excel" in text or "xlsx" in text:
+
+        return "xlsx"
+
+
+    if "buat powerpoint" in text or "pptx" in text:
+
+        return "pptx"
+
+
+    return None
+
+
+
+# =========================================================
+# HANDLE AI REQUEST
+# =========================================================
+
+
+def handle_ai_request(
+    chat_id,
+    text
+):
+
+
+    output_type = detect_output_request(
+
+        text
 
     )
 
 
 
-    if response.status_code != 200:
+    # -------------------------------------
+    # AI THINKING
+    # -------------------------------------
 
 
-        raise Exception(
+    prompt = (
 
-            f"GROQ_HTTP_{response.status_code}"
+        SYSTEM_PROMPT
 
-        )
+        + "\n"
+
+        + memory_summary()
+
+    )
 
 
+    answer, ai_name = ask_ai(
 
-    data = response.json()
+        prompt,
 
-
-
-    answer = (
-
-        data["choices"][0]
-
-        ["message"]
-
-        ["content"]
+        text
 
     )
 
 
 
-    if not answer:
+    # -------------------------------------
+    # CREATE FILE OUTPUT
+    # -------------------------------------
 
-        raise Exception(
-            "GROQ_EMPTY"
-        )
 
-
-
-    return answer.strip()
-
-
-
-# =========================================================
-# OPENROUTER
-# =========================================================
-
-
-def ask_openrouter(text):
-
-
-    if not OPENROUTER_API_KEY:
-
-        raise Exception(
-            "OPENROUTER_NOT_CONFIGURED"
-        )
-
-
-    response = requests.post(
-
-
-        "https://openrouter.ai/api/v1/chat/completions",
-
-
-
-        headers={
-
-
-            "Authorization":
-
-                f"Bearer {OPENROUTER_API_KEY}",
-
-
-
-            "Content-Type":
-
-                "application/json",
-
-
-
-            "HTTP-Referer":
-
-                "https://github.com",
-
-
-
-            "X-Title":
-
-                "Fadli AI Assistant"
-
-        },
-
-
-        json={
-
-
-            "model":
-
-                "openrouter/free",
-
-
-
-            "messages": [
-
-
-                {
-
-
-                    "role":
-
-                        "system",
-
-
-
-                    "content":
-
-                        SYSTEM_PROMPT
-
-                        + "\n"
-
-                        + memory_summary()
-
-                },
-
-
-                {
-
-
-                    "role":
-
-                        "user",
-
-
-
-                    "content":
-
-                        text
-
-                }
-
-            ],
-
-
-
-            "temperature":
-
-                0.7,
-
-
-
-            "max_tokens":
-
-                1800
-
-        },
-
-
-        timeout=60
-
-    )
-
-
-    if response.status_code != 200:
-
-
-        raise Exception(
-
-            f"OPENROUTER_HTTP_{response.status_code}"
-
-        )
-
-
-    data = response.json()
-
-
-
-    answer = (
-
-        data["choices"][0]
-
-        ["message"]
-
-        ["content"]
-
-    )
-
-
-
-    if not answer:
-
-        raise Exception(
-            "OPENROUTER_EMPTY"
-        )
-
-
-    return answer.strip()
-    
-# =========================================================
-# GEMINI
-# =========================================================
-
-
-def ask_gemini(text):
-
-    if not GEMINI_API_KEY:
-
-        raise Exception(
-            "GEMINI_NOT_CONFIGURED"
-        )
-
-
-    from google import genai
-
-
-    client = genai.Client(
-
-        api_key=GEMINI_API_KEY
-
-    )
-
-
-    response = client.models.generate_content(
-
-        model="gemini-3.1-flash-lite",
-
-
-        contents=[
-
-
-            SYSTEM_PROMPT,
-
-
-            memory_summary(),
-
-
-            "\nPESAN FADLI:\n",
-
-
-            text
-
-        ]
-
-    )
-
-
-
-    answer = getattr(
-
-        response,
-
-        "text",
-
-        None
-
-    )
-
-
-
-    if not answer:
-
-        raise Exception(
-            "GEMINI_EMPTY"
-        )
-
-
-
-    return answer.strip()
-
-
-
-# =========================================================
-# AI ROUTER
-# =========================================================
-
-
-def ask_ai(text):
-
-
-    providers = [
-
-
-        ("Groq", ask_groq),
-
-
-        ("OpenRouter", ask_openrouter),
-
-
-        ("Gemini", ask_gemini)
-
-    ]
-
-
-
-    for name, function in providers:
+    if output_type:
 
 
         try:
 
 
-            print(
+            filename = create_file(
 
-                f"AI → {name}"
+                output_type,
+
+                answer
 
             )
 
 
-            answer = function(text)
+
+            if filename:
 
 
-            return answer, name
+                telegram_send_file(
+
+                    chat_id,
+
+                    filename,
+
+                    f"🤖 Fadli AI • {ai_name}"
+
+                )
+
+
+
+                try:
+
+                    os.remove(
+
+                        filename
+
+                    )
+
+                except:
+
+                    pass
+
+
+
+                return
 
 
 
@@ -876,37 +759,24 @@ def ask_ai(text):
 
             print(
 
-                f"{name} gagal:",
+                "OUTPUT ERROR:",
 
                 repr(error)
 
             )
 
 
-            continue
+
+    # -------------------------------------
+    # NORMAL TEXT RESPONSE
+    # -------------------------------------
 
 
+    telegram_send(
 
-    return (
+        chat_id,
 
-        "Maaf, saya sedang tidak dapat memproses pesan ini.",
-
-        "System"
-
-    )
-
-
-
-# =========================================================
-# FOOTER
-# =========================================================
-
-
-def footer(answer, ai_name):
-
-    return (
-
-        answer.strip()
+        answer
 
         + "\n\n———\n"
 
@@ -915,86 +785,26 @@ def footer(answer, ai_name):
     )
 
 
-# =========================================================
-# MEMORY SCORE
-# =========================================================
-
-
-def add_score(value):
-
-
-    memory = load_memory()
-
-
-
-    scores = memory.setdefault(
-
-        "scores",
-
-        []
-
-    )
-
-
-
-    scores.append(value)
-
-
-
-    memory["scores"] = scores[-100:]
-
-
-
-    save_memory(memory)
-
-
-
-
-def add_feedback(value):
-
-
-    memory = load_memory()
-
-
-
-    feedback = memory.setdefault(
-
-        "feedback",
-
-        []
-
-    )
-
-
-
-    feedback.append(value)
-
-
-
-    memory["feedback"] = feedback[-100:]
-
-
-
-    save_memory(memory)
-
 
 # =========================================================
-# COMMANDS
+# COMMAND HANDLER
 # =========================================================
 
 
-def handle_command(chat_id, text):
+def handle_command(
+    chat_id,
+    text
+):
 
 
-    lower = text.lower().strip()
+    command = text.lower().strip()
 
 
 
-    if lower == "/start":
+    if command == "/start":
 
 
         telegram_send(
-
 
             chat_id,
 
@@ -1002,42 +812,29 @@ def handle_command(chat_id, text):
             """🤖 FADLI AI
 
 
-Saya siap menjadi partner berpikir Anda.
+Saya siap membantu.
 
 
-🔥 Trend
+Kemampuan:
 
-🎬 Script
+💬 Chat AI
 
-💡 Ide konten
+📄 Membaca dokumen
 
-🧠 Brainstorming
+🖼️ Membaca gambar
 
-📱 TikTok / Reels
+📊 Analisis file
 
-📊 Marketing
+📁 Membuat PDF
 
-🤖 AI & teknologi
+📁 Membuat DOCX
 
+📁 Membuat XLSX
 
-Kirim pesan atau file langsung."""
-
-        )
-
-
-        return True
+📁 Membuat PPTX
 
 
-
-    if lower == "/ping":
-
-
-        telegram_send(
-
-            chat_id,
-
-
-            "🟢 Fadli AI online\n\n———\n🤖 Fadli AI • System"
+Kirim pesan atau file."""
 
         )
 
@@ -1046,13 +843,28 @@ Kirim pesan atau file langsung."""
 
 
 
-    if lower == "/memory":
+    if command == "/ping":
 
 
         telegram_send(
 
             chat_id,
 
+            "🟢 Fadli AI Online"
+
+        )
+
+
+        return True
+
+
+
+    if command == "/memory":
+
+
+        telegram_send(
+
+            chat_id,
 
             json.dumps(
 
@@ -1071,60 +883,61 @@ Kirim pesan atau file langsung."""
 
 
 
-    if lower.startswith("/score"):
+    if command.startswith("/feedback"):
 
 
-        value = text[len("/score"):].strip()
+        value = text.replace(
+
+            "/feedback",
+
+            ""
+
+        ).strip()
 
 
 
-        if value:
+        memory = load_memory()
 
 
-            add_score(value)
+
+        memory.setdefault(
+
+            "feedback",
+
+            []
+
+        ).append(
+
+            value
+
+        )
 
 
-            telegram_send(
+        save_memory(
 
-                chat_id,
+            memory
 
-                "📊 Score tersimpan."
+        )
 
-            )
+
+
+        telegram_send(
+
+            chat_id,
+
+            "🧠 Feedback tersimpan."
+
+        )
 
 
         return True
 
-
-
-    if lower.startswith("/feedback"):
-
-
-        value = text[len("/feedback"):].strip()
-
-
-
-        if value:
-
-
-            add_feedback(value)
-
-
-            telegram_send(
-
-                chat_id,
-
-                "🧠 Feedback tersimpan."
-
-            )
-
-
-        return True
 
 
     return False
-    # =========================================================
-# TELEGRAM GET UPDATES
+
+# =========================================================
+# TELEGRAM UPDATES
 # =========================================================
 
 
@@ -1153,101 +966,9 @@ def get_updates(offset=None):
     return response.json()
 
 
-# =========================================================
-# PROCESS TELEGRAM FILE
-# =========================================================
-
-
-def process_telegram_file(message, chat_id):
-
-
-    filename = None
-
-
-
-    # DOCUMENT
-    if message.get("document"):
-
-
-        telegram_send(
-
-            chat_id,
-
-            "📂 File diterima, sedang membaca..."
-
-        )
-
-
-        file_id = message["document"]["file_id"]
-
-
-        filename = download_telegram_file(
-
-            file_id
-
-        )
-
-
-
-    # PHOTO
-
-    elif message.get("photo"):
-
-
-        telegram_send(
-
-            chat_id,
-
-            "🖼️ Gambar diterima, sedang membaca..."
-
-        )
-
-
-        file_id = message["photo"][-1]["file_id"]
-
-
-        filename = download_telegram_file(
-
-            file_id
-
-        )
-
-
-
-    if filename:
-
-
-        result = process_file(
-
-            filename
-
-        )
-
-
-        try:
-
-            os.remove(filename)
-
-        except:
-
-            pass
-
-
-
-        return (
-
-            "Analisis file berikut:\n\n"
-
-            + result
-
-        )
-
-
-    return None
-
 
 # =========================================================
-# BOT
+# BOT RUNNER
 # =========================================================
 
 
@@ -1255,41 +976,29 @@ def run_bot():
 
 
     print(
-
         "===================================="
-
     )
 
     print(
-
-        "FADLI AI CHAT"
-
+        "FADLI AI ASSISTANT"
     )
 
     print(
-
-        "Groq → OpenRouter → Gemini"
-
+        "Groq → OpenAI → OpenRouter → Gemini"
     )
 
     print(
-
-        "Multi File Support Active"
-
+        "File Input + File Output Active"
     )
 
     print(
-
         "===================================="
-
     )
 
 
-
-    # Hapus webhook
+    # Remove webhook
 
     try:
-
 
         requests.post(
 
@@ -1302,12 +1011,11 @@ def run_bot():
 
     except Exception as error:
 
-
         print(
 
-            "Webhook cleanup:",
+            "Webhook error:",
 
-            repr(error)
+            error
 
         )
 
@@ -1338,7 +1046,6 @@ def run_bot():
                 []
 
             ):
-
 
 
                 offset = (
@@ -1380,7 +1087,7 @@ def run_bot():
 
                     print(
 
-                        "Unauthorized chat:",
+                        "Unauthorized:",
 
                         chat_id
 
@@ -1409,7 +1116,21 @@ def run_bot():
 
 
 
-                # HANDLE FILE
+                # COMMAND
+
+                if text and handle_command(
+
+                    chat_id,
+
+                    text
+
+                ):
+
+                    continue
+
+
+
+                # FILE INPUT
 
                 if (
 
@@ -1420,7 +1141,7 @@ def run_bot():
                 ):
 
 
-                    text = process_telegram_file(
+                    extracted = process_telegram_file(
 
                         message,
 
@@ -1429,54 +1150,34 @@ def run_bot():
                     )
 
 
+                    if extracted:
 
-                if not text:
+
+                        handle_ai_request(
+
+                            chat_id,
+
+                            extracted
+
+                        )
+
 
                     continue
 
 
 
-                # COMMAND
+                # TEXT INPUT
 
-                if handle_command(
-
-                    chat_id,
-
-                    text
-
-                ):
-
-                    continue
+                if text:
 
 
+                    handle_ai_request(
 
-                # AI
+                        chat_id,
 
-                answer, ai_name = ask_ai(
+                        text
 
-                    text
-
-                )
-
-
-
-                final_message = footer(
-
-                    answer,
-
-                    ai_name
-
-                )
-
-
-
-                telegram_send(
-
-                    chat_id,
-
-                    final_message
-
-                )
+                    )
 
 
 
@@ -1485,7 +1186,7 @@ def run_bot():
 
             print(
 
-                "Bot stopped."
+                "Bot stopped"
 
             )
 
