@@ -1,13 +1,41 @@
-import fitz
+import pymupdf
 
 
-def read_pdf(path):
+def process_pdf(filename):
 
-    text = ""
+    try:
 
-    doc = fitz.open(path)
+        document = pymupdf.open(filename)
 
-    for page in doc:
-        text += page.get_text()
+        pages = []
 
-    return text[:12000]
+        for page in document:
+
+            text = page.get_text()
+
+            if text:
+                pages.append(text)
+
+        document.close()
+
+        result = "\n\n".join(pages).strip()
+
+        if not result:
+
+            return (
+                "PDF berhasil dibuka, "
+                "tetapi tidak ditemukan teks. "
+                "Kemungkinan PDF berupa hasil scan/gambar."
+            )
+
+        return result
+
+
+    except Exception as error:
+
+        print(
+            "PDF PROCESS ERROR:",
+            repr(error)
+        )
+
+        raise
