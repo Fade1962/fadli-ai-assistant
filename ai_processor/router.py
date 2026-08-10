@@ -3,6 +3,7 @@ import os
 from .gemini import ask_gemini
 from .groq import ask_groq, ask_groq_compound
 from .openrouter import ask_openrouter
+from response_guard import sanitize_output
 
 # Jangan gunakan kata umum seperti "hari ini" atau "sekarang" sendirian.
 # Itu membuat percakapan biasa salah dianggap sebagai permintaan berita/web.
@@ -73,7 +74,9 @@ def ask_ai(system_prompt, user_text, mode="auto"):
             print(f"AI -> {name}")
             answer = fn()
             if answer:
-                return answer.strip(), name
+                cleaned = sanitize_output(answer)
+                if cleaned:
+                    return cleaned.strip(), name
         except Exception as exc:
             errors.append(f"{name}: {exc!r}")
             print(f"{name} failed: {exc!r}")
