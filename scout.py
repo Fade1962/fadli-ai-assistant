@@ -8,17 +8,20 @@ from google.genai import types
 
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 CHAT_ID = str(os.environ["CHAT_ID"])
-GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
-TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 
 MEMORY_FILE = "memory.json"
 
-
-client = genai.Client(
-    api_key=GEMINI_API_KEY
+TELEGRAM_URL = (
+    f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 )
 
+
+# =========================================================
+# MEMORY
+# =========================================================
 
 def load_memory():
 
@@ -28,14 +31,18 @@ def load_memory():
             MEMORY_FILE,
             "r",
             encoding="utf-8"
-        ) as file:
+        ) as f:
 
-            return json.load(file)
+            return json.load(f)
 
     except Exception:
 
         return {}
 
+
+# =========================================================
+# TELEGRAM
+# =========================================================
 
 def send_message(text):
 
@@ -54,50 +61,61 @@ def send_message(text):
     response.raise_for_status()
 
 
-def scout():
+# =========================================================
+# GEMINI SCOUT
+# =========================================================
+
+def scout_gemini():
+
+    client = genai.Client(
+        api_key=GEMINI_API_KEY
+    )
 
     memory = load_memory()
 
     prompt = f"""
-Kamu adalah Fadli Daily Trend Scout.
+Kamu adalah FADLI DAILY TREND SCOUT.
 
-Cari tren yang sedang ramai dalam 24-48 jam terakhir
-yang berpotensi menjadi konten personal branding Fadli.
+Cari tren Indonesia yang sedang ramai dalam
+24-48 jam terakhir dan cocok dijadikan konten
+personal branding Fadli.
 
-Fokus:
+IDENTITAS FADLI:
 
-- ekonomi keluarga
-- dunia kerja
-- gaji
-- biaya hidup
-- AI
-- teknologi
-- side hustle
-- bapak/ayah
-- keluarga
-- parenting realistis
-- Gen Z
-- Milenial
-- social media
-- creator economy
-- fenomena sosial
-- marketing
-- otomotif jika sangat relevan
-
-IDENTITAS:
-
-Fadli adalah bapak 2 anak, suami, pekerja,
-Marketing Communication, designer dan orang yang
-sedang berusaha meningkatkan ekonomi keluarga.
+Bapak 2 anak.
+Suami.
+Pekerja.
+Marketing Communication.
+Designer.
+Digital marketing.
+AI dan teknologi.
+Sedang berusaha meningkatkan ekonomi keluarga.
 
 POSITIONING:
 
-"Bapak 2 anak yang bekerja dan terus belajar
-untuk memperbaiki kehidupan keluarga."
+"Bapak 2 anak yang bekerja, belajar dan berjuang
+memperbaiki kehidupan keluarga."
 
-==================================================
-MEMORY
-==================================================
+PRIORITAS:
+
+1. Ekonomi keluarga
+2. Biaya hidup
+3. Dunia kerja
+4. Gaji
+5. Side hustle
+6. AI
+7. Teknologi
+8. Parenting realistis
+9. Kehidupan bapak
+10. Gen Z
+11. Milenial
+12. Social media
+13. Creator economy
+14. Fenomena sosial
+15. Marketing
+16. Otomotif jika sangat relevan
+
+MEMORY:
 
 TOPIK DISUKAI:
 {memory.get("preferred_topics", [])}
@@ -111,117 +129,226 @@ SCORE:
 FEEDBACK:
 {memory.get("feedback", [])[-20:]}
 
-==================================================
-SCORING
-==================================================
+CARI DAN PILIH 3 TREND TERBAIK.
 
-Untuk setiap kandidat berikan:
+Untuk setiap trend:
 
-🔥 VIRAL SCORE 1-10
-❤️ RELEVANCE 1-10
-🎯 CONTENT POTENTIAL 1-10
+🔥 TOPIK
 
-FINAL SCORE =
-(Viral + Relevance + Content Potential) / 3
+📈 Apa yang sedang terjadi
 
-Setelah mencari tren, hanya tampilkan
-3 TOPIK TERBAIK.
+🔥 VIRAL SCORE: X/10
 
-==================================================
-FORMAT
-==================================================
+❤️ RELEVANCE FADLI: X/10
 
-🔥 TREND #1
+🎯 CONTENT POTENTIAL: X/10
 
-TOPIK:
+🏆 FINAL SCORE: X/10
 
-🔥 Viral:
-X/10
+🎯 ANGLE FADLI
 
-❤️ Relevance:
-X/10
+🎬 HOOK
 
-🎯 Content:
-X/10
+📝 SCRIPT 30-60 DETIK
 
-🏆 FINAL:
-X/10
+💬 CTA
 
-📈 Kenapa ramai:
+🎥 FORMAT VIDEO
 
-🎯 Angle Fadli:
-
-🎬 Hook:
-
-📝 Script 30-60 detik:
-
-💬 CTA:
-
-🎥 Format video:
-
-🔗 Sumber:
-
-
-Ulangi untuk #2 dan #3.
-
-Terakhir:
-
-🏆 TOP PICK HARI INI
-
-Jelaskan alasan memilihnya.
+🔗 SUMBER
 
 PENTING:
 
-- Jangan mengarang berita.
-- Jangan mengarang angka.
-- Jangan menyalin creator lain.
-- Jangan membuat Fadli terlihat kaya atau sukses besar.
+- Gunakan informasi terbaru.
+- Jangan mengarang.
+- Jangan clickbait palsu.
+- Jangan membuat Fadli terlihat kaya.
+- Jangan menjadi motivator generik.
 - Jangan mengeksploitasi anak.
-- Utamakan pengalaman dan sudut pandang manusia.
+- Cari angle yang realistis dan relatable.
+
+Di akhir:
+
+🏆 TOP PICK HARI INI
+
+Pilih hanya satu trend terbaik.
+Jelaskan mengapa paling cocok untuk personal
+branding Fadli.
 """
 
+    config = types.GenerateContentConfig(
+
+        tools=[
+            types.Tool(
+                google_search=types.GoogleSearch()
+            )
+        ]
+    )
+
+    response = client.models.generate_content(
+
+        model="gemini-3.1-flash-lite",
+
+        contents=prompt,
+
+        config=config
+    )
+
+    return response.text
+
+
+# =========================================================
+# OPENROUTER FALLBACK
+# =========================================================
+
+def scout_openrouter():
+
+    memory = load_memory()
+
+    prompt = f"""
+Buat Daily Trend Scout untuk Fadli.
+
+Cari 3 topik viral/relevan Indonesia terbaru.
+
+Fokus:
+ekonomi keluarga, dunia kerja, AI,
+teknologi, bapak 2 anak, parenting,
+Gen Z, Milenial dan fenomena sosial.
+
+Memory:
+{memory}
+
+Untuk masing-masing:
+
+TOPIK
+VIRAL SCORE
+RELEVANCE
+CONTENT POTENTIAL
+FINAL SCORE
+ANGLE
+HOOK
+SCRIPT 30-60 DETIK
+CTA
+
+Jangan mengarang sumber.
+Jika informasi terbaru tidak tersedia,
+katakan dengan jujur.
+"""
+
+    response = requests.post(
+
+        "https://openrouter.ai/api/v1/chat/completions",
+
+        headers={
+            "Authorization":
+                f"Bearer {OPENROUTER_API_KEY}",
+
+            "Content-Type":
+                "application/json"
+        },
+
+        json={
+            "model":
+                "openrouter/free",
+
+            "messages": [
+
+                {
+                    "role":
+                        "system",
+
+                    "content":
+                        "Kamu adalah trend scout "
+                        "personal branding Indonesia."
+                },
+
+                {
+                    "role":
+                        "user",
+
+                    "content":
+                        prompt
+                }
+            ],
+
+            "max_tokens":
+                2500
+        },
+
+        timeout=60
+    )
+
+    response.raise_for_status()
+
+    data = response.json()
+
+    return data["choices"][0]["message"]["content"]
+
+
+# =========================================================
+# MAIN
+# =========================================================
+
+def main():
+
+    result = None
+
+    # PRIMARY
     try:
 
-        config = types.GenerateContentConfig(
-
-            tools=[
-                types.Tool(
-                    google_search=types.GoogleSearch()
-                )
-            ]
+        print(
+            "SCOUT → Gemini Search"
         )
 
-        response = client.models.generate_content(
-
-            model="gemini-3.1-flash-lite",
-
-            contents=prompt,
-
-            config=config
-        )
-
-        return response.text
+        result = scout_gemini()
 
     except Exception as error:
 
-        return (
-            "⚠️ Daily Scout error:\n\n"
-            + str(error)[:1000]
+        print(
+            "Gemini Scout gagal:",
+            repr(error)
         )
+
+
+    # FALLBACK
+    if not result:
+
+        try:
+
+            print(
+                "SCOUT → OpenRouter"
+            )
+
+            result = scout_openrouter()
+
+        except Exception as error:
+
+            print(
+                "OpenRouter Scout gagal:",
+                repr(error)
+            )
+
+            result = (
+                "⚠️ Daily Scout gagal dijalankan.\n\n"
+                "Semua AI sedang mencapai limit."
+            )
+
+
+    message = (
+        "🌅 FADLI DAILY PERSONAL BRANDING SCOUT\n"
+        "━━━━━━━━━━━━━━━━━━━━\n\n"
+        + result
+    )
+
+    send_message(
+        message
+    )
+
+    print(
+        "Daily Scout selesai."
+    )
 
 
 if __name__ == "__main__":
 
-    result = scout()
-
-    message = (
-        "🌅 FADLI DAILY PERSONAL BRANDING SCOUT\n\n"
-        "🔥 Tren terbaru untuk bahan konten Anda:\n\n"
-        + result
-    )
-
-    send_message(message)
-
-    print(
-        "Daily Scout berhasil dikirim."
-    )
+    main()
