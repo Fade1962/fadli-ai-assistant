@@ -16,9 +16,7 @@ def process_file(filename):
 
     if extension == ".pdf":
 
-        return process_pdf(
-            filename
-        )
+        return process_pdf(filename)
 
 
     elif extension in (
@@ -28,9 +26,7 @@ def process_file(filename):
         ".webp"
     ):
 
-        return process_image(
-            filename
-        )
+        return process_image(filename)
 
 
     elif extension in (
@@ -38,9 +34,7 @@ def process_file(filename):
         ".doc"
     ):
 
-        return process_document(
-            filename
-        )
+        return process_document(filename)
 
 
     elif extension in (
@@ -49,9 +43,7 @@ def process_file(filename):
         ".csv"
     ):
 
-        return process_spreadsheet(
-            filename
-        )
+        return process_spreadsheet(filename)
 
 
     elif extension in (
@@ -59,9 +51,7 @@ def process_file(filename):
         ".ppt"
     ):
 
-        return process_presentation(
-            filename
-        )
+        return process_presentation(filename)
 
 
     else:
