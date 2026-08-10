@@ -1,133 +1,252 @@
 import os
+import base64
+import requests
 
-from google import genai
-from google.genai import types
 
+OPENAI_API_KEY = os.environ.get(
+    "OPENAI_API_KEY"
+)
 
 GEMINI_API_KEY = os.environ.get(
-    "GEMINI_API_KEY",
-    ""
+    "GEMINI_API_KEY"
+)
+
+OPENROUTER_API_KEY = os.environ.get(
+    "OPENROUTER_API_KEY"
 )
 
 
-def get_mime_type(filename):
-
-    extension = os.path.splitext(
-        filename
-    )[1].lower()
-
-    mime_types = {
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".png": "image/png",
-        ".webp": "image/webp",
-    }
-
-    return mime_types.get(
-        extension,
-        "image/jpeg"
-    )
+# =========================================================
+# IMAGE VISION ROUTER
+#
+# Prioritas:
+#
+# OpenAI Vision
+# ↓
+# Gemini Vision
+# ↓
+# OpenRouter Vision
+#
+# =========================================================
 
 
-def analyze_image(
-    filename,
-    prompt=None
+
+def encode_image(
+    filename
 ):
-
-    if not GEMINI_API_KEY:
-
-        raise Exception(
-            "GEMINI_API_KEY_MISSING"
-        )
-
-
-    if not prompt:
-
-        prompt = """
-Kamu sedang menganalisis sebuah gambar
-yang dikirim oleh Fadli.
-
-Analisis gambar secara langsung.
-
-Jelaskan:
-
-1. Apa yang terlihat.
-2. Objek utama.
-3. Orang jika memang terlihat.
-4. Teks yang terlihat.
-5. Konteks gambar.
-6. Jika berupa desain:
-   - layout
-   - warna
-   - typography
-   - hierarchy
-   - komposisi
-   - kekurangan
-   - saran perbaikan
-7. Jika berupa dokumen:
-   - isi utama
-   - informasi penting
-   - tabel jika ada
-8. Jika berupa screenshot:
-   - jelaskan isi layar
-   - error jika ada
-   - informasi penting.
-
-Jangan hanya melakukan OCR.
-
-Gunakan kemampuan vision untuk memahami
-isi visual gambar.
-
-Jangan mengarang sesuatu yang tidak terlihat.
-
-Jika sesuatu tidak jelas, katakan tidak jelas.
-"""
-
-
-    print(
-        "VISION → Gemini"
-    )
-
-
-    client = genai.Client(
-        api_key=GEMINI_API_KEY
-    )
-
 
     with open(
         filename,
         "rb"
     ) as file:
 
-        image_bytes = file.read()
+        return base64.b64encode(
+            file.read()
+        ).decode(
+            "utf-8"
+        )
 
 
-    mime_type = get_mime_type(
+
+
+
+# =========================================================
+# OPENAI VISION
+# =========================================================
+
+
+def ask_openai_vision(
+    filename
+):
+
+    if not OPENAI_API_KEY:
+
+        raise Exception(
+            "OPENAI_API_KEY_NOT_FOUND"
+        )
+
+
+    image_base64 = encode_image(
         filename
     )
 
 
+    response = requests.post(
+
+        "https://api.openai.com/v1/chat/completions",
+
+        headers={
+
+            "Authorization":
+            f"Bearer {OPENAI_API_KEY}",
+
+            "Content-Type":
+            "application/json"
+
+        },
+
+
+        json={
+
+            "model":
+            "gpt-4.1-mini",
+
+
+            "messages":[
+
+
+                {
+
+                    "role":
+                    "system",
+
+                    "content":
+                    "Kamu adalah AI vision assistant. Analisa gambar dengan detail dan akurat."
+
+                },
+
+
+                {
+
+                    "role":
+                    "user",
+
+                    "content":[
+
+
+                        {
+
+                            "type":
+                            "text",
+
+                            "text":
+                            "Analisa gambar ini."
+
+                        },
+
+
+                        {
+
+                            "type":
+                            "image_url",
+
+                            "image_url":{
+
+                                "url":
+                                f"data:image/jpeg;base64,{image_base64}"
+
+                            }
+
+                        }
+
+                    ]
+
+                }
+
+            ],
+
+
+            "max_tokens":
+            1500
+
+        },
+
+
+        timeout=90
+
+    )
+
+
+    if response.status_code != 200:
+
+        raise Exception(
+            f"OPENAI_VISION_ERROR_{response.status_code}"
+        )
+
+
+    data = response.json()
+
+
+    return (
+
+        data["choices"][0]
+
+        ["message"]
+
+        ["content"]
+
+        .strip()
+
+    )
+
+
+
+
+
+# =========================================================
+# GEMINI VISION
+# =========================================================
+
+
+def ask_gemini_vision(
+    filename
+):
+
+    if not GEMINI_API_KEY:
+
+        raise Exception(
+            "GEMINI_API_KEY_NOT_FOUND"
+        )
+
+
+    from google import genai
+
+    from PIL import Image
+
+
+
+    client = genai.Client(
+
+        api_key=GEMINI_API_KEY
+
+    )
+
+
+
+    image = Image.open(
+
+        filename
+
+    )
+
+
+
     response = client.models.generate_content(
 
-        model="gemini-2.5-flash",
+        model=
+
+        "gemini-2.5-flash",
+
 
         contents=[
 
-            types.Part.from_bytes(
-                data=image_bytes,
-                mime_type=mime_type
-            ),
+            "Analisa gambar ini secara detail.",
 
-            prompt
+            image
 
         ]
+
     )
 
 
     answer = getattr(
+
         response,
+
         "text",
+
         None
+
     )
 
 
@@ -139,3 +258,227 @@ Jika sesuatu tidak jelas, katakan tidak jelas.
 
 
     return answer.strip()
+
+
+
+
+
+# =========================================================
+# OPENROUTER VISION
+# =========================================================
+
+
+def ask_openrouter_vision(
+    filename
+):
+
+
+    if not OPENROUTER_API_KEY:
+
+        raise Exception(
+            "OPENROUTER_API_KEY_NOT_FOUND"
+        )
+
+
+
+    image_base64 = encode_image(
+
+        filename
+
+    )
+
+
+
+    response = requests.post(
+
+
+        "https://openrouter.ai/api/v1/chat/completions",
+
+
+        headers={
+
+
+            "Authorization":
+
+            f"Bearer {OPENROUTER_API_KEY}",
+
+
+            "Content-Type":
+
+            "application/json"
+
+        },
+
+
+
+        json={
+
+
+            "model":
+
+            "google/gemini-2.5-flash",
+
+
+
+            "messages":[
+
+
+                {
+
+                    "role":
+                    "user",
+
+                    "content":[
+
+
+                        {
+
+                            "type":
+                            "text",
+
+                            "text":
+                            "Analisa gambar ini."
+
+                        },
+
+
+                        {
+
+                            "type":
+                            "image_url",
+
+                            "image_url":{
+
+                                "url":
+                                f"data:image/jpeg;base64,{image_base64}"
+
+                            }
+
+                        }
+
+                    ]
+
+                }
+
+            ]
+
+        },
+
+
+        timeout=90
+
+    )
+
+
+
+    if response.status_code != 200:
+
+
+        raise Exception(
+
+            f"OPENROUTER_VISION_ERROR_{response.status_code}"
+
+        )
+
+
+
+    data = response.json()
+
+
+
+    return (
+
+        data["choices"][0]
+
+        ["message"]
+
+        ["content"]
+
+        .strip()
+
+    )
+
+
+
+
+
+# =========================================================
+# MAIN VISION ROUTER
+# =========================================================
+
+
+def ask_vision(
+    filename
+):
+
+
+    providers = [
+
+
+        (
+            "OpenAI Vision",
+            ask_openai_vision
+        ),
+
+
+        (
+            "Gemini Vision",
+            ask_gemini_vision
+        ),
+
+
+        (
+            "OpenRouter Vision",
+            ask_openrouter_vision
+        )
+
+    ]
+
+
+
+    for name, function in providers:
+
+
+        try:
+
+
+            print(
+
+                "VISION →",
+
+                name
+
+            )
+
+
+            return function(
+
+                filename
+
+            )
+
+
+
+        except Exception as error:
+
+
+            print(
+
+                name,
+
+                "FAILED:",
+
+                repr(error)
+
+            )
+
+
+            continue
+
+
+
+    return (
+
+        "Maaf, gambar tidak dapat dianalisa."
+
+    )
