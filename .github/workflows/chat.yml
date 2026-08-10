@@ -3,20 +3,28 @@ name: NARA Realtime Bot
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 */5 * * *"
+    - cron: "0 */6 * * *"
 
 concurrency:
   group: nara-realtime-bot
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   bot:
     runs-on: ubuntu-latest
-    timeout-minutes: 330
+    timeout-minutes: 355
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Restore NARA memory
+        uses: actions/cache/restore@v4
+        with:
+          path: data
+          key: nara-data-${{ github.run_id }}
+          restore-keys: |
+            nara-data-
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -45,7 +53,17 @@ jobs:
           TIMEZONE: Asia/Makassar
           ALLOW_SENSITIVE_FALLBACK: "false"
 
-          # Daily Radar is handled by daily_scout.yml so it is not sent twice.
-          DIGEST_TIME: ""
+          # Daily Radar dibuat oleh bot yang sama agar rating dan memory tersambung.
+          DIGEST_TIME: "06:00"
+
+          # Berhenti normal sebelum batas GitHub agar database sempat disimpan ke cache.
+          RUN_DURATION_MINUTES: "350"
 
         run: python -u app.py
+
+      - name: Save NARA memory
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data
+          key: nara-data-${{ github.run_id }}
