@@ -1,28 +1,8 @@
 import os
-import json
 import requests
 import xml.etree.ElementTree as ET
 
 from urllib.parse import quote
-
-
-# =========================================================
-# FADLI DAILY TREND SCOUT
-#
-# 06:00 WITA
-#
-# Google News RSS
-#       ↓
-# kumpulkan headline
-#       ↓
-# Groq
-#       ↓
-# OpenRouter
-#       ↓
-# Gemini
-#       ↓
-# Telegram
-# =========================================================
 
 
 TELEGRAM_TOKEN = os.environ.get(
@@ -37,6 +17,7 @@ CHAT_ID = str(
     )
 )
 
+
 GROQ_API_KEY = os.environ.get(
     "GROQ_API_KEY"
 )
@@ -49,102 +30,95 @@ GEMINI_API_KEY = os.environ.get(
     "GEMINI_API_KEY"
 )
 
-MEMORY_FILE = "memory.json"
+
+OPENAI_API_KEY = os.environ.get(
+    "OPENAI_API_KEY"
+)
+
 
 TELEGRAM_URL = (
     f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 )
 
 
-# =========================================================
-# MEMORY
-# =========================================================
 
-def load_memory():
-
-    try:
-
-        with open(
-            MEMORY_FILE,
-            "r",
-            encoding="utf-8"
-        ) as f:
-
-            return json.load(f)
-
-    except Exception:
-
-        return {}
-
-
-# =========================================================
+# =====================================================
 # TELEGRAM
-# =========================================================
+# =====================================================
 
 def send_message(text):
 
     try:
 
-        response = requests.post(
+        requests.post(
 
             f"{TELEGRAM_URL}/sendMessage",
 
             data={
+
                 "chat_id":
                     CHAT_ID,
 
                 "text":
                     text
+
             },
 
             timeout=30
         )
 
-        response.raise_for_status()
 
     except Exception as error:
 
         print(
-            "TELEGRAM ERROR:",
+            "Telegram error:",
             repr(error)
         )
 
 
-# =========================================================
-# GOOGLE NEWS RSS
-# =========================================================
+
+# =====================================================
+# GOOGLE NEWS
+# =====================================================
 
 def get_news():
 
+
     queries = [
 
-        "Indonesia viral hari ini",
-
-        "Indonesia ekonomi gaji kerja",
+        "Indonesia ekonomi",
 
         "Indonesia AI teknologi",
 
-        "Indonesia Gen Z milenial",
+        "Gen Z Indonesia",
 
-        "Indonesia parenting keluarga",
+        "dunia kerja Indonesia",
 
-        "Indonesia TikTok creator"
+        "parenting Indonesia",
+
+        "otomotif Indonesia"
+
     ]
+
 
     articles = []
 
+
     for query in queries:
+
 
         try:
 
-            encoded = quote(
-                query
+            url = (
+
+                "https://news.google.com/rss/search?"
+
+                f"q={quote(query)}"
+
+                "&hl=id&gl=ID&ceid=ID:id"
+
             )
 
-            url = (
-                "https://news.google.com/rss/search?"
-                f"q={encoded}&hl=id&gl=ID&ceid=ID:id"
-            )
 
             response = requests.get(
 
@@ -153,567 +127,293 @@ def get_news():
                 timeout=20,
 
                 headers={
+
                     "User-Agent":
-                        "Mozilla/5.0"
+                    "Mozilla/5.0"
+
                 }
+
             )
 
-            response.raise_for_status()
 
             root = ET.fromstring(
                 response.content
             )
 
+
             for item in root.findall(
                 ".//item"
-            )[:8]:
+            )[:5]:
+
 
                 title = item.findtext(
                     "title"
                 )
 
+
                 link = item.findtext(
                     "link"
                 )
 
-                pub_date = item.findtext(
-                    "pubDate"
-                )
 
                 if title:
 
-                    articles.append({
+                    articles.append(
 
-                        "title":
-                            title.strip(),
+                        {
 
-                        "link":
-                            link or "",
+                            "title":
+                                title,
 
-                        "date":
-                            pub_date or ""
-                    })
+                            "link":
+                                link
+
+                        }
+
+                    )
+
 
         except Exception as error:
 
             print(
-                "RSS error:",
-                query,
-                repr(error)
+                "RSS ERROR:",
+                error
             )
 
 
-    # hapus duplikat
-
-    unique = []
-
-    seen = set()
-
-    for article in articles:
-
-        title = article["title"]
-
-        if title in seen:
-            continue
-
-        seen.add(title)
-
-        unique.append(
-            article
-        )
+    return articles[:30]
 
 
-    return unique[:40]
+
+# =====================================================
+# AI
+# =====================================================
+
+def ask_ai(prompt):
 
 
-# =========================================================
-# PROMPT
-# =========================================================
+    # ==========================
+    # GROQ
+    # ==========================
 
-def build_prompt(articles):
+    if GROQ_API_KEY:
 
-    memory = load_memory()
 
-    news_text = ""
+        try:
 
-    for index, article in enumerate(
-        articles,
+            response = requests.post(
+
+                "https://api.groq.com/openai/v1/chat/completions",
+
+                headers={
+
+                    "Authorization":
+                    f"Bearer {GROQ_API_KEY}",
+
+                    "Content-Type":
+                    "application/json"
+
+                },
+
+
+                json={
+
+                    "model":
+                    "llama-3.3-70b-versatile",
+
+
+                    "messages":[
+
+                        {
+
+                            "role":
+                            "system",
+
+                            "content":
+                            "Kamu adalah analis trend Indonesia."
+
+                        },
+
+                        {
+
+                            "role":
+                            "user",
+
+                            "content":
+                            prompt
+
+                        }
+
+                    ],
+
+
+                    "temperature":
+                    0.5
+
+                },
+
+
+                timeout=60
+
+            )
+
+
+            data=response.json()
+
+
+            return (
+
+                data["choices"][0]
+
+                ["message"]
+
+                ["content"]
+
+            )
+
+        except Exception as error:
+
+            print(
+                "Groq gagal:",
+                error
+            )
+
+
+
+    return None
+
+
+
+# =====================================================
+# BUILD ANALYSIS
+# =====================================================
+
+def create_prompt(news):
+
+
+    text=""
+
+
+    for i,item in enumerate(
+        news,
         start=1
     ):
 
-        news_text += (
 
-            f"\n{index}. "
-            f"{article['title']}\n"
+        text += (
 
-            f"Sumber: "
-            f"{article['link']}\n"
+            f"{i}. {item['title']}\n"
 
-            f"Waktu: "
-            f"{article['date']}\n"
         )
+
 
 
     return f"""
 
-Kamu adalah FADLI DAILY PERSONAL BRANDING SCOUT.
+Kamu adalah Fadli AI Daily Scout.
 
-Gunakan headline aktual di bawah ini.
+Analisa berita berikut untuk personal branding Fadli.
 
-Tujuan:
+Profil:
 
-Menemukan topik yang bisa dijadikan konten
-TikTok, Instagram Reels atau YouTube Shorts
-untuk personal branding Fadli.
-
-IDENTITAS FADLI:
-
-Bapak 2 anak.
-Suami.
-Pekerja.
-Marketing Communication.
-Designer.
-Digital marketing.
-Belajar AI.
-Belajar teknologi.
-Sedang berjuang meningkatkan ekonomi keluarga.
-
-POSITIONING:
-
-"Bapak 2 anak yang bekerja, belajar dan berjuang
-memperbaiki kehidupan keluarga."
-
-PILAR:
-
-- ekonomi keluarga
-- biaya hidup
-- gaji
-- dunia kerja
-- side hustle
-- penghasilan tambahan
-- AI
-- teknologi
-- parenting realistis
-- kehidupan bapak
-- Gen Z
-- Milenial
-- social media
-- creator economy
-- fenomena sosial
-- marketing
-- otomotif jika relevan
-
-MEMORY:
-
-TOPIK DISUKAI:
-{memory.get("preferred_topics", [])}
-
-TOPIK DIHINDARI:
-{memory.get("avoided_topics", [])}
-
-SCORE:
-{memory.get("scores", [])[-20:]}
-
-FEEDBACK:
-{memory.get("feedback", [])[-20:]}
+- Bapak 2 anak
+- Marketing Communication
+- Designer
+- Digital marketing
+- Belajar AI
+- Pekerja biasa yang ingin berkembang
 
 
-PILIH 3 TOPIK TERBAIK.
+Pilih 3 topik terbaik.
 
-Untuk masing-masing:
+Format:
+
 
 🔥 TOPIK
 
-📈 APA YANG TERJADI
+Apa yang terjadi:
 
-🔥 VIRAL SCORE: X/10
+Kenapa menarik:
 
-❤️ RELEVANCE FADLI: X/10
+Viral Score:
 
-🎯 CONTENT POTENTIAL: X/10
+Relevansi untuk Fadli:
 
-🏆 FINAL SCORE: X/10
+Ide konten:
 
-🎯 ANGLE FADLI
+Hook:
 
-🎬 HOOK
+CTA:
 
-📝 SCRIPT 30–60 DETIK
 
-💬 CTA
+Berita:
 
-🎥 FORMAT VIDEO
+{text}
 
-🔗 SUMBER
-
-Kemudian:
-
-🏆 TOP PICK HARI INI
-
-Pilih satu topik terbaik.
-
-Jelaskan kenapa topik tersebut
-paling cocok untuk Fadli.
-
-ATURAN:
-
-- Jangan mengarang berita.
-- Jangan membuat sumber palsu.
-- Jangan membuat Fadli terlihat kaya.
-- Jangan menjadi motivator generik.
-- Jangan mengeksploitasi anak.
-- Jangan membuat pengalaman pribadi Fadli.
-- Gunakan fakta dari headline yang diberikan.
-- Bedakan fakta dan opini.
-- Utamakan relevansi daripada sekadar viral.
-
-HEADLINE AKTUAL:
-
-{news_text}
+Jangan mengarang fakta.
 """
 
 
-# =========================================================
-# GROQ
-# =========================================================
 
-def ask_groq(prompt):
-
-    if not GROQ_API_KEY:
-
-        raise Exception(
-            "GROQ_NOT_CONFIGURED"
-        )
-
-    response = requests.post(
-
-        "https://api.groq.com/openai/v1/chat/completions",
-
-        headers={
-
-            "Authorization":
-                f"Bearer {GROQ_API_KEY}",
-
-            "Content-Type":
-                "application/json"
-        },
-
-        json={
-
-            "model":
-                "llama-3.3-70b-versatile",
-
-            "messages": [
-
-                {
-                    "role":
-                        "system",
-
-                    "content":
-                        "Kamu adalah trend analyst "
-                        "untuk personal branding creator Indonesia."
-                },
-
-                {
-                    "role":
-                        "user",
-
-                    "content":
-                        prompt
-                }
-            ],
-
-            "temperature":
-                0.5,
-
-            "max_tokens":
-                3500
-        },
-
-        timeout=60
-    )
-
-    if response.status_code != 200:
-
-        raise Exception(
-            f"GROQ_HTTP_{response.status_code}"
-        )
-
-    data = response.json()
-
-    return (
-        data["choices"][0]
-        ["message"]["content"]
-        .strip()
-    )
-
-
-# =========================================================
-# OPENROUTER
-# =========================================================
-
-def ask_openrouter(prompt):
-
-    if not OPENROUTER_API_KEY:
-
-        raise Exception(
-            "OPENROUTER_NOT_CONFIGURED"
-        )
-
-    response = requests.post(
-
-        "https://openrouter.ai/api/v1/chat/completions",
-
-        headers={
-
-            "Authorization":
-                f"Bearer {OPENROUTER_API_KEY}",
-
-            "Content-Type":
-                "application/json",
-
-            "HTTP-Referer":
-                "https://github.com",
-
-            "X-Title":
-                "Fadli Daily Trend Scout"
-        },
-
-        json={
-
-            "model":
-                "openrouter/free",
-
-            "messages": [
-
-                {
-                    "role":
-                        "system",
-
-                    "content":
-                        "Kamu adalah trend analyst "
-                        "personal branding."
-                },
-
-                {
-                    "role":
-                        "user",
-
-                    "content":
-                        prompt
-                }
-            ],
-
-            "temperature":
-                0.5,
-
-            "max_tokens":
-                3500
-        },
-
-        timeout=60
-    )
-
-    if response.status_code != 200:
-
-        raise Exception(
-            f"OPENROUTER_HTTP_{response.status_code}"
-        )
-
-    data = response.json()
-
-    return (
-        data["choices"][0]
-        ["message"]["content"]
-        .strip()
-    )
-
-
-# =========================================================
-# GEMINI
-# =========================================================
-
-def ask_gemini(prompt):
-
-    if not GEMINI_API_KEY:
-
-        raise Exception(
-            "GEMINI_NOT_CONFIGURED"
-        )
-
-    from google import genai
-
-    client = genai.Client(
-        api_key=GEMINI_API_KEY
-    )
-
-    response = client.models.generate_content(
-
-        model="gemini-3.1-flash-lite",
-
-        contents=prompt
-    )
-
-    answer = getattr(
-        response,
-        "text",
-        None
-    )
-
-    if not answer:
-
-        raise Exception(
-            "GEMINI_EMPTY"
-        )
-
-    return answer.strip()
-
-
-# =========================================================
+# =====================================================
 # MAIN
-# =========================================================
+# =====================================================
 
 def main():
 
-    print(
-        "=================================="
-    )
 
     print(
-        "FADLI DAILY TREND SCOUT"
-    )
-
-    print(
-        "Mengambil headline terbaru..."
-    )
-
-    print(
-        "=================================="
+        "FADLI DAILY SCOUT START"
     )
 
 
-    # -----------------------------------------------------
-    # NEWS
-    # -----------------------------------------------------
+    news = get_news()
 
-    articles = get_news()
 
-    if not articles:
+    if not news:
 
         print(
-            "Tidak mendapatkan headline."
+            "Tidak ada berita"
         )
 
         return
 
 
-    print(
-        f"Headline ditemukan: {len(articles)}"
+
+    prompt = create_prompt(
+        news
     )
 
 
-    prompt = build_prompt(
-        articles
+    result = ask_ai(
+        prompt
     )
 
 
-    # -----------------------------------------------------
-    # AI ROUTER
-    # -----------------------------------------------------
 
-    providers = [
+    if result:
 
-        (
-            "Groq",
-            ask_groq
-        ),
 
-        (
-            "OpenRouter",
-            ask_openrouter
-        ),
+        send_message(
 
-        (
-            "Gemini",
-            ask_gemini
+            "🌅 FADLI DAILY SCOUT\n\n"
+
+            + result
+
+            + "\n\n———\n🤖 Fadli AI Scout"
+
         )
-    ]
 
 
-    result = None
-    ai_name = None
 
+    else:
 
-    for name, function in providers:
-
-        try:
-
-            print(
-                f"SCOUT AI → {name}"
-            )
-
-            result = function(
-                prompt
-            )
-
-            ai_name = name
-
-            break
-
-        except Exception as error:
-
-            print(
-                f"{name} gagal:",
-                repr(error)
-            )
-
-
-    # -----------------------------------------------------
-    # SEMUA AI GAGAL
-    # -----------------------------------------------------
-
-    if not result:
 
         print(
-            "Semua AI gagal."
+            "AI gagal"
         )
 
-        # Jangan kirim error teknis ke Telegram.
 
-        return
-
-
-    # -----------------------------------------------------
-    # TELEGRAM
-    # -----------------------------------------------------
-
-    message = (
-
-        "🌅 FADLI DAILY PERSONAL BRANDING SCOUT\n"
-
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-
-        + result
-
-        + "\n\n━━━━━━━━━━━━━━━━━━━━\n"
-
-        + f"🤖 Fadli AI • {ai_name}"
-    )
-
-
-    send_message(
-        message
-    )
-
-
-    print(
-        "Daily Scout berhasil dikirim."
-    )
-
-
-# =========================================================
-# START
-# =========================================================
 
 if __name__ == "__main__":
 
