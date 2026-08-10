@@ -35,12 +35,11 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
- 
-          AI_PROVIDER_ORDER: openai,gemini,groq,openrouter
 
+          AI_PROVIDER_ORDER: openai,gemini,groq,openrouter
           TIMEZONE: Asia/Makassar
 
-          # Daily Scout sudah ditangani daily_scout.yml
+          # Daily Scout ditangani oleh daily_scout.yml agar tidak terkirim dua kali.
           DIGEST_TIME: ""
 
         run: python -u app.py
