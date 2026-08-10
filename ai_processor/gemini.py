@@ -1,7 +1,7 @@
 import os
-import base64
 
 from google import genai
+
 
 
 GEMINI_API_KEY = os.environ.get(
@@ -10,9 +10,16 @@ GEMINI_API_KEY = os.environ.get(
 
 
 
+# =========================================================
+# GEMINI TEXT AI
+#
+# Provider terakhir fallback
+#
+# =========================================================
+
+
 def ask_gemini(
-    prompt,
-    image_path=None
+    prompt
 ):
 
 
@@ -32,59 +39,13 @@ def ask_gemini(
 
 
 
-    contents = [
-
-        prompt
-
-    ]
-
-
-
-    if image_path:
-
-
-        with open(
-
-            image_path,
-
-            "rb"
-
-        ) as file:
-
-
-            image_bytes = file.read()
-
-
-
-        contents.append(
-
-            {
-
-                "mime_type":
-                "image/jpeg",
-
-
-                "data":
-                image_bytes
-
-            }
-
-        )
-
-
-
-
     response = client.models.generate_content(
 
 
-        model=
-        "gemini-2.5-flash",
+        model="gemini-2.5-flash",
 
 
-        contents=
-
-        contents
-
+        contents=prompt
 
     )
 
@@ -104,8 +65,11 @@ def ask_gemini(
 
     if not answer:
 
+
         raise Exception(
-            "GEMINI_EMPTY"
+
+            "GEMINI_EMPTY_RESPONSE"
+
         )
 
 
