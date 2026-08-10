@@ -1,20 +1,23 @@
 import os
 import json
 import requests
+
 from google import genai
 from google.genai import types
+
 
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 CHAT_ID = str(os.environ["CHAT_ID"])
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
-client = genai.Client(
-    api_key=GEMINI_API_KEY
-)
-
 TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
 MEMORY_FILE = "memory.json"
+
+
+client = genai.Client(
+    api_key=GEMINI_API_KEY
+)
 
 
 def load_memory():
@@ -25,18 +28,18 @@ def load_memory():
             MEMORY_FILE,
             "r",
             encoding="utf-8"
-        ) as f:
+        ) as file:
 
-            return json.load(f)
+            return json.load(file)
 
-    except:
+    except Exception:
 
         return {}
 
 
 def send_message(text):
 
-    requests.post(
+    response = requests.post(
 
         f"{TELEGRAM_URL}/sendMessage",
 
@@ -48,159 +51,133 @@ def send_message(text):
         timeout=30
     )
 
+    response.raise_for_status()
 
-def run_scout():
+
+def scout():
 
     memory = load_memory()
 
     prompt = f"""
-Kamu adalah Fadli AI Personal Branding Scout.
+Kamu adalah Fadli Daily Trend Scout.
 
-Cari minimal 10 topik/tren yang sedang ramai
-dalam 24-48 jam terakhir.
+Cari tren yang sedang ramai dalam 24-48 jam terakhir
+yang berpotensi menjadi konten personal branding Fadli.
 
-Gunakan Google Search.
+Fokus:
 
-TARGET:
-
-Fadli adalah:
-- suami
-- ayah 2 anak
-- pekerja
-- Marketing Communication
-- designer
-- digital marketer
-- tertarik AI
-- tertarik teknologi
-- sedang berusaha meningkatkan ekonomi keluarga
-- sedang belajar skill baru
-- ingin membangun personal branding
-
-Cari topik:
-
-- ekonomi
-- biaya hidup
+- ekonomi keluarga
 - dunia kerja
 - gaji
-- side hustle
+- biaya hidup
 - AI
 - teknologi
-- parenting
+- side hustle
+- bapak/ayah
 - keluarga
-- pernikahan
+- parenting realistis
 - Gen Z
 - Milenial
 - social media
 - creator economy
 - fenomena sosial
-- tren internet
 - marketing
-- otomotif jika relevan
+- otomotif jika sangat relevan
 
-====================================================
-SCORING
-====================================================
+IDENTITAS:
 
-Setiap topik wajib memiliki:
+Fadli adalah bapak 2 anak, suami, pekerja,
+Marketing Communication, designer dan orang yang
+sedang berusaha meningkatkan ekonomi keluarga.
 
-🔥 VIRAL SCORE: 1-10
+POSITIONING:
 
-Seberapa ramai topik tersebut.
+"Bapak 2 anak yang bekerja dan terus belajar
+untuk memperbaiki kehidupan keluarga."
 
-❤️ PERSONAL RELEVANCE: 1-10
-
-Seberapa dekat dengan kehidupan Fadli.
-
-🎯 CONTENT POTENTIAL: 1-10
-
-Seberapa mudah dan menarik jika dibuat
-menjadi TikTok/Reels.
-
-🏆 FINAL SCORE:
-
-Rata-rata dari ketiga skor.
-
-Jangan hanya memilih berita besar.
-
-Cari topik yang memungkinkan Fadli
-berbicara dari pengalaman atau sudut pandangnya.
-
-====================================================
-MEMORY FADLI
-====================================================
+==================================================
+MEMORY
+==================================================
 
 TOPIK DISUKAI:
-{memory.get("liked", [])}
+{memory.get("preferred_topics", [])}
 
-TOPIK TIDAK DISUKAI:
-{memory.get("disliked", [])}
+TOPIK DIHINDARI:
+{memory.get("avoided_topics", [])}
+
+SCORE:
+{memory.get("scores", [])[-20:]}
 
 FEEDBACK:
-{memory.get("feedback", [])}
+{memory.get("feedback", [])[-20:]}
 
-SCORE SEBELUMNYA:
-{memory.get("scores", [])}
+==================================================
+SCORING
+==================================================
 
-Gunakan data ini untuk meningkatkan rekomendasi.
+Untuk setiap kandidat berikan:
 
-====================================================
-HASIL
-====================================================
+🔥 VIRAL SCORE 1-10
+❤️ RELEVANCE 1-10
+🎯 CONTENT POTENTIAL 1-10
 
-Tampilkan 3 terbaik.
+FINAL SCORE =
+(Viral + Relevance + Content Potential) / 3
 
-Untuk setiap topik:
+Setelah mencari tren, hanya tampilkan
+3 TOPIK TERBAIK.
+
+==================================================
+FORMAT
+==================================================
 
 🔥 TREND #1
 
 TOPIK:
 
-🔥 VIRAL SCORE:
+🔥 Viral:
 X/10
 
-❤️ PERSONAL RELEVANCE:
+❤️ Relevance:
 X/10
 
-🎯 CONTENT POTENTIAL:
+🎯 Content:
 X/10
 
-🏆 FINAL SCORE:
+🏆 FINAL:
 X/10
 
-📈 KENAPA RAMAI:
+📈 Kenapa ramai:
 
-🎯 ANGLE FADLI:
+🎯 Angle Fadli:
 
-🎬 HOOK:
+🎬 Hook:
 
-📝 SCRIPT:
+📝 Script 30-60 detik:
 
 💬 CTA:
 
-🎥 FORMAT:
+🎥 Format video:
 
-📹 VISUAL:
+🔗 Sumber:
 
-🔗 SUMBER:
 
-====================================================
+Ulangi untuk #2 dan #3.
 
-Di akhir:
+Terakhir:
 
 🏆 TOP PICK HARI INI
 
-Jelaskan kenapa topik tersebut
-paling layak dibuat.
+Jelaskan alasan memilihnya.
 
-Jangan membuat Fadli terlihat sukses besar.
+PENTING:
 
-Jangan mengarang pengalaman pribadi.
-
-Jangan mengeksploitasi keluarga.
-
-Jangan menyalin script orang lain.
-
-Utamakan authenticity daripada viralitas.
+- Jangan mengarang berita.
+- Jangan mengarang angka.
+- Jangan menyalin creator lain.
+- Jangan membuat Fadli terlihat kaya atau sukses besar.
+- Jangan mengeksploitasi anak.
+- Utamakan pengalaman dan sudut pandang manusia.
 """
 
     try:
@@ -228,18 +205,18 @@ Utamakan authenticity daripada viralitas.
     except Exception as error:
 
         return (
-            "⚠️ Daily Scout Error:\n\n"
-            + str(error)[:1500]
+            "⚠️ Daily Scout error:\n\n"
+            + str(error)[:1000]
         )
 
 
 if __name__ == "__main__":
 
-    result = run_scout()
+    result = scout()
 
     message = (
-        "🌅 GOOD MORNING FADLI\n\n"
-        "🔥 PERSONAL BRANDING DAILY SCOUT\n\n"
+        "🌅 FADLI DAILY PERSONAL BRANDING SCOUT\n\n"
+        "🔥 Tren terbaru untuk bahan konten Anda:\n\n"
         + result
     )
 
