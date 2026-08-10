@@ -1,49 +1,72 @@
 import os
 
-from .pdf import read_pdf
-from .image import read_image
-from .document import read_docx
-from .spreadsheet import read_excel
-from .presentation import read_pptx
+from .pdf import process_pdf
+from .image import process_image
+from .document import process_document
+from .spreadsheet import process_spreadsheet
+from .presentation import process_presentation
 
 
-def process_file(path):
+def process_file(filename):
 
-    ext = os.path.splitext(path)[1].lower()
+    extension = os.path.splitext(
+        filename
+    )[1].lower()
 
-    try:
 
-        if ext == ".pdf":
-            return read_pdf(path)
+    if extension == ".pdf":
 
-        elif ext in [".jpg", ".jpeg", ".png", ".webp"]:
-            return read_image(path)
-
-        elif ext == ".docx":
-            return read_docx(path)
-
-        elif ext in [".xlsx", ".xls", ".csv"]:
-            return read_excel(path)
-
-        elif ext == ".pptx":
-            return read_pptx(path)
-
-        elif ext == ".txt":
-            with open(
-                path,
-                "r",
-                encoding="utf-8"
-            ) as f:
-                return f.read()
-
-        else:
-            return "Format file belum didukung."
-
-    except Exception as e:
-
-        print(
-            "FILE PROCESS ERROR:",
-            repr(e)
+        return process_pdf(
+            filename
         )
 
-        return "File gagal dibaca."
+
+    elif extension in (
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".webp"
+    ):
+
+        return process_image(
+            filename
+        )
+
+
+    elif extension in (
+        ".docx",
+        ".doc"
+    ):
+
+        return process_document(
+            filename
+        )
+
+
+    elif extension in (
+        ".xlsx",
+        ".xls",
+        ".csv"
+    ):
+
+        return process_spreadsheet(
+            filename
+        )
+
+
+    elif extension in (
+        ".pptx",
+        ".ppt"
+    ):
+
+        return process_presentation(
+            filename
+        )
+
+
+    else:
+
+        return (
+            "Format file belum didukung: "
+            + extension
+        )
