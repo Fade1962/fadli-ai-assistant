@@ -15,12 +15,9 @@ TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 CHAT_ID = str(os.environ["CHAT_ID"])
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
-TELEGRAM_URL = (
-    f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
-)
+TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
 MEMORY_FILE = "memory.json"
-
 
 client = genai.Client(
     api_key=GEMINI_API_KEY
@@ -28,35 +25,32 @@ client = genai.Client(
 
 
 # =========================================================
-# PERSONAL BRANDING
+# SYSTEM PROMPT
 # =========================================================
 
 SYSTEM_PROMPT = """
 Kamu adalah FADLI AI PERSONAL BRANDING ASSISTANT.
 
-Kamu adalah partner diskusi Fadli untuk membangun
-personal branding di TikTok, Instagram Reels,
-YouTube Shorts dan media sosial.
+Tugas utama:
+Menjadi partner berpikir Fadli untuk membangun personal
+branding di TikTok, Instagram Reels, YouTube Shorts
+dan media sosial.
 
-========================================================
-IDENTITAS FADLI
-========================================================
+IDENTITAS:
 
-Fadli adalah:
-
+Fadli:
 - Suami.
 - Ayah 2 anak.
 - Seorang pekerja.
-- Bekerja di Marketing Communication.
-- Memiliki kemampuan desain.
+- Marketing Communication.
+- Designer.
 - Social media.
 - Motion graphic.
 - Video editing.
 - Digital marketing.
-- AI.
-- Teknologi.
+- AI dan teknologi.
 - Marketing otomotif.
-- Sedang berusaha meningkatkan kondisi ekonomi keluarga.
+- Sedang berusaha meningkatkan ekonomi keluarga.
 - Sedang belajar skill baru.
 - Sedang membangun personal branding.
 
@@ -67,29 +61,24 @@ berjuang memperbaiki kehidupan keluarga,
 dan memanfaatkan teknologi serta kreativitas
 untuk berkembang."
 
-Jangan membuat Fadli terlihat seperti:
-
+JANGAN membuat Fadli terlihat seperti:
 - motivator sukses
 - orang kaya
 - financial guru
 - pakar kehidupan
 
-========================================================
-PERSONAL BRANDING
-========================================================
+GAYA:
 
-Konten Fadli harus:
-
-- jujur
 - natural
+- jujur
 - relatable
-- personal
 - sederhana
+- personal
 - tidak menggurui
 - tidak sok sukses
 - tidak berlebihan
 
-Tema utama:
+PILAR KONTEN:
 
 1. Kehidupan pekerja
 2. Ekonomi keluarga
@@ -103,108 +92,42 @@ Tema utama:
 10. Digital marketing
 11. Content creation
 12. Teknologi
-13. Gen Z dan Milenial
-14. Fenomena sosial
-15. Tren internet
-16. Otomotif jika relevan
+13. Gen Z
+14. Milenial
+15. Fenomena sosial
+16. Tren internet
+17. Otomotif jika relevan
 
-========================================================
-TUGAS
-========================================================
+PRINSIP:
 
-Kamu bisa membantu:
+Jangan selalu menyetujui ide Fadli.
 
-- mencari ide konten
-- menganalisis trend
-- membuat hook
-- membuat script
-- membuat CTA
-- mengembangkan angle
-- mengkritik ide Fadli
-- membuat konsep video
-- membuat storytelling
-- membandingkan beberapa ide
-- memberikan scoring
-- berdiskusi tentang personal branding
+Jika idenya lemah:
+- katakan lemah
+- jelaskan alasannya
+- berikan angle yang lebih kuat
 
-Jika Fadli memberikan ide yang buruk,
-jangan selalu menyetujuinya.
-
-Berikan kritik yang jujur.
-
-Jika ada angle yang lebih kuat,
-jelaskan alasannya.
-
-========================================================
-SCRIPT
-========================================================
-
-Jika diminta membuat script:
+Jika membuat script:
 
 HOOK
-
 STORY
-
 INSIGHT
-
 ENDING
-
 CTA
 
-Durasi ideal:
+Target:
 30-60 detik.
 
-Gunakan bahasa Indonesia percakapan.
+Bahasa harus terdengar seperti orang Indonesia
+berbicara, bukan artikel.
 
-Jangan seperti artikel.
+Jangan mengarang pengalaman pribadi Fadli.
 
-Jangan seperti AI.
+Jangan mengarang berita atau data.
 
-========================================================
-TREND
-========================================================
+Jangan mengeksploitasi anak dan keluarga.
 
-Jika Fadli meminta informasi terbaru,
-gunakan Google Search.
-
-Jangan mengarang berita.
-
-Jangan mengarang data.
-
-Jangan menyalin konten creator lain.
-
-========================================================
-KELUARGA
-========================================================
-
-Jangan mengeksploitasi anak atau keluarga.
-
-Jangan membuka informasi pribadi keluarga.
-
-Jangan menjadikan masalah keluarga sebagai
-clickbait murahan.
-
-Gunakan keluarga sebagai konteks kehidupan,
-bukan sebagai objek eksploitasi.
-
-========================================================
-MEMORY
-========================================================
-
-Gunakan memory Fadli untuk memahami:
-
-- konten yang disukai
-- konten yang tidak disukai
-- score sebelumnya
-- gaya konten
-- feedback
-- topik favorit
-- topik yang ingin dikurangi
-
-Memory adalah preferensi, bukan fakta baru tentang
-kehidupan Fadli.
-
-Jangan mengarang informasi yang tidak ada di memory.
+Jika membahas tren terbaru, gunakan Google Search.
 """
 
 
@@ -233,7 +156,9 @@ def load_memory():
             "feedback": [],
             "preferred_topics": [],
             "avoided_topics": [],
-            "content_style": {}
+            "content_style": {
+                "tone": "natural, jujur, relatable"
+            }
         }
 
 
@@ -253,34 +178,29 @@ def save_memory(memory):
         )
 
 
-def memory_context():
+def get_memory_summary():
 
     memory = load_memory()
 
     return f"""
-========================================================
-MEMORY FADLI
-========================================================
+PREFERENSI FADLI:
 
 TOPIK DISUKAI:
-{memory.get("liked", [])}
-
-TOPIK TIDAK DISUKAI:
-{memory.get("disliked", [])}
-
-TOPIK FAVORIT:
 {memory.get("preferred_topics", [])}
 
-TOPIK YANG DIHINDARI:
+TOPIK TIDAK DISUKAI:
 {memory.get("avoided_topics", [])}
 
-SCORE:
-{memory.get("scores", [])}
+FEEDBACK POSITIF:
+{memory.get("liked", [])[-10:]}
 
-FEEDBACK:
-{memory.get("feedback", [])}
+FEEDBACK NEGATIF:
+{memory.get("disliked", [])[-10:]}
 
-GAYA KONTEN:
+SCORE TERBARU:
+{memory.get("scores", [])[-15:]}
+
+GAYA:
 {memory.get("content_style", {})}
 """
 
@@ -289,47 +209,24 @@ GAYA KONTEN:
 # GEMINI
 # =========================================================
 
-def ask_gemini(text):
-
-    lower = text.lower()
-
-    search_keywords = [
-        "viral",
-        "tren",
-        "trend",
-        "terbaru",
-        "hari ini",
-        "berita",
-        "ramai",
-        "hype",
-        "tiktok",
-        "instagram",
-        "youtube",
-        "ekonomi",
-        "ai",
-        "teknologi",
-        "harga",
-        "kebijakan"
-    ]
-
-    use_search = any(
-        keyword in lower
-        for keyword in search_keywords
-    )
-
-    config = None
-
-    if use_search:
-
-        config = types.GenerateContentConfig(
-            tools=[
-                types.Tool(
-                    google_search=types.GoogleSearch()
-                )
-            ]
-        )
+def ask_gemini(
+    text,
+    use_search=False
+):
 
     try:
+
+        config = None
+
+        if use_search:
+
+            config = types.GenerateContentConfig(
+                tools=[
+                    types.Tool(
+                        google_search=types.GoogleSearch()
+                    )
+                ]
+            )
 
         response = client.models.generate_content(
 
@@ -337,8 +234,8 @@ def ask_gemini(text):
 
             contents=[
                 SYSTEM_PROMPT,
-                memory_context(),
-                "\nPESAN FADLI:\n",
+                get_memory_summary(),
+                "\nPERTANYAAN FADLI:\n",
                 text
             ],
 
@@ -353,74 +250,43 @@ def ask_gemini(text):
 
     except Exception as error:
 
-        print("GEMINI ERROR:")
-        print(repr(error))
+        print(
+            "GEMINI ERROR:",
+            repr(error)
+        )
 
         return (
-            "⚠️ Terjadi masalah dengan Gemini.\n\n"
-            + str(error)[:1500]
+            "⚠️ Gemini sedang mencapai batas quota "
+            "atau mengalami error.\n\n"
+            f"{str(error)[:500]}"
         )
 
 
 # =========================================================
-# FEEDBACK / MEMORY LEARNING
+# MEMORY COMMANDS
 # =========================================================
 
-def process_feedback(text):
-
-    lower = text.lower()
+def save_score(text):
 
     memory = load_memory()
 
-    is_feedback = any(
-        word in lower
-        for word in [
-            "score",
-            "nilai",
-            "saya suka",
-            "saya tidak suka",
-            "kurangi",
-            "lebih banyak",
-            "lebih sedikit",
-            "cocok",
-            "tidak cocok"
-        ]
-    )
+    memory["scores"].append(text)
 
-    if not is_feedback:
-
-        return False
-
-    memory["feedback"].append(text)
-
-    if (
-        "saya suka" in lower
-        or "bagus" in lower
-        or "cocok" in lower
-        or "lebih banyak" in lower
-    ):
-
-        memory["liked"].append(text)
-
-    if (
-        "saya tidak suka" in lower
-        or "tidak cocok" in lower
-        or "kurangi" in lower
-        or "lebih sedikit" in lower
-    ):
-
-        memory["disliked"].append(text)
-
-    if (
-        "score" in lower
-        or "nilai" in lower
-    ):
-
-        memory["scores"].append(text)
+    # Batasi memory supaya file tidak membesar terus.
+    memory["scores"] = memory["scores"][-100:]
 
     save_memory(memory)
 
-    return True
+
+def save_feedback(text):
+
+    memory = load_memory()
+
+    memory["feedback"].append(text)
+
+    memory["feedback"] = memory["feedback"][-100:]
+
+    save_memory(memory)
 
 
 # =========================================================
@@ -440,10 +306,6 @@ def send_message(
         max_length
     ):
 
-        part = text[
-            i:i + max_length
-        ]
-
         try:
 
             response = requests.post(
@@ -452,7 +314,9 @@ def send_message(
 
                 data={
                     "chat_id": chat_id,
-                    "text": part
+                    "text": text[
+                        i:i + max_length
+                    ]
                 },
 
                 timeout=30
@@ -463,7 +327,7 @@ def send_message(
         except Exception as error:
 
             print(
-                "TELEGRAM SEND ERROR:",
+                "TELEGRAM ERROR:",
                 repr(error)
             )
 
@@ -490,16 +354,14 @@ def get_updates(
 
 
 # =========================================================
-# BOT LOOP
+# BOT
 # =========================================================
 
 def run_bot():
 
     print("==============================")
-    print("FADLI AI CHAT")
-    print("==============================")
-    print("Telegram polling started.")
-    print("Bot is running 24/7.")
+    print("FADLI AI")
+    print("24/7 TELEGRAM BOT")
     print("==============================")
 
     offset = None
@@ -511,11 +373,6 @@ def run_bot():
             data = get_updates(
                 offset
             )
-
-            if not data.get("ok"):
-
-                time.sleep(5)
-                continue
 
             for update in data.get(
                 "result",
@@ -547,21 +404,23 @@ def run_bot():
                     message["chat"]["id"]
                 )
 
-                # Hanya Fadli
+                # SECURITY
                 if chat_id != CHAT_ID:
 
                     continue
+
+                lower = text.lower().strip()
 
                 print(
                     "MESSAGE:",
                     text
                 )
 
-                # =========================================
-                # COMMAND
-                # =========================================
+                # =================================================
+                # SIMPLE COMMAND
+                # =================================================
 
-                if text.lower() == "/ping":
+                if lower == "/ping":
 
                     send_message(
                         chat_id,
@@ -571,15 +430,81 @@ def run_bot():
                     continue
 
 
-                if text.lower() == "/memory":
+                if lower == "/start":
+
+                    send_message(
+                        chat_id,
+
+                        """🤖 FADLI AI PERSONAL BRANDING
+
+Saya siap menjadi partner diskusi Anda.
+
+🔥 Analisis tren
+🎯 Scoring
+🎬 Script
+💡 Ide konten
+🧠 Kritik konsep
+📱 TikTok/Reels
+❤️ Personal branding
+
+COMMAND:
+
+/ping
+/memory
+/score
+/feedback
+
+Contoh:
+
+/score ekonomi 9
+/score AI 8
+/feedback saya ingin lebih banyak konten ekonomi keluarga
+
+Atau langsung chat seperti biasa."""
+                    )
+
+                    continue
+
+
+                # =================================================
+                # MEMORY
+                # =================================================
+
+                if lower == "/memory":
 
                     memory = load_memory()
+
+                    summary = {
+                        "preferred_topics":
+                            memory.get(
+                                "preferred_topics",
+                                []
+                            ),
+
+                        "avoided_topics":
+                            memory.get(
+                                "avoided_topics",
+                                []
+                            ),
+
+                        "scores":
+                            memory.get(
+                                "scores",
+                                []
+                            )[-20:],
+
+                        "feedback":
+                            memory.get(
+                                "feedback",
+                                []
+                            )[-20:]
+                    }
 
                     send_message(
                         chat_id,
 
                         json.dumps(
-                            memory,
+                            summary,
                             ensure_ascii=False,
                             indent=2
                         )
@@ -588,56 +513,115 @@ def run_bot():
                     continue
 
 
-                if text.lower() == "/start":
+                # =================================================
+                # SCORE
+                # =================================================
+
+                if lower.startswith("/score"):
+
+                    score_text = text[
+                        len("/score"):
+                    ].strip()
+
+                    if not score_text:
+
+                        send_message(
+                            chat_id,
+
+                            "Format:\n\n"
+                            "/score ekonomi 9\n"
+                            "/score AI 8\n"
+                            "/score parenting 7"
+                        )
+
+                        continue
+
+                    save_score(
+                        score_text
+                    )
 
                     send_message(
-
                         chat_id,
 
-                        """🤖 FADLI AI PERSONAL BRANDING
-
-Saya siap menjadi partner diskusi konten Anda.
-
-🔥 Analisis trend
-🎯 Scoring trend
-🎬 Buat script
-💡 Kembangkan ide
-🧠 Kritik konsep
-📱 Strategi TikTok/Reels
-❤️ Personal branding
-
-Command:
-
-/ping
-/memory
-
-Atau langsung ngobrol seperti biasa."""
+                        "📊 Score tersimpan.\n\n"
+                        f"→ {score_text}\n\n"
+                        "Saya akan gunakan untuk "
+                        "menyesuaikan rekomendasi tren "
+                        "berikutnya."
                     )
 
                     continue
 
 
-                # =========================================
+                # =================================================
                 # FEEDBACK
-                # =========================================
+                # =================================================
 
-                if process_feedback(text):
+                if lower.startswith("/feedback"):
+
+                    feedback = text[
+                        len("/feedback"):
+                    ].strip()
+
+                    if not feedback:
+
+                        send_message(
+                            chat_id,
+
+                            "Contoh:\n\n"
+                            "/feedback saya ingin lebih "
+                            "banyak konten tentang ekonomi "
+                            "keluarga dan dunia kerja."
+                        )
+
+                        continue
+
+                    save_feedback(
+                        feedback
+                    )
 
                     send_message(
-
                         chat_id,
 
                         "🧠 Feedback tersimpan.\n\n"
                         "Saya akan gunakan untuk "
-                        "menyesuaikan rekomendasi berikutnya."
+                        "menyesuaikan gaya rekomendasi."
                     )
 
                     continue
 
 
-                # =========================================
-                # NORMAL CHAT
-                # =========================================
+                # =================================================
+                # SEARCH ROUTER
+                # =================================================
+
+                search_words = [
+
+                    "viral",
+                    "tren",
+                    "trend",
+                    "terbaru",
+                    "hari ini",
+                    "sekarang",
+                    "ramai",
+                    "hype",
+                    "berita",
+                    "tiktok",
+                    "instagram",
+                    "youtube",
+                    "harga terbaru",
+                    "kebijakan terbaru"
+                ]
+
+                use_search = any(
+                    word in lower
+                    for word in search_words
+                )
+
+
+                # =================================================
+                # NORMAL AI CHAT
+                # =================================================
 
                 send_message(
                     chat_id,
@@ -645,7 +629,8 @@ Atau langsung ngobrol seperti biasa."""
                 )
 
                 answer = ask_gemini(
-                    text
+                    text,
+                    use_search=use_search
                 )
 
                 send_message(
