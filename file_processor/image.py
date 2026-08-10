@@ -1,51 +1,162 @@
 import os
-
 from PIL import Image
+import pytesseract
 
-from ai_processor.vision import analyze_image
 
 
-SUPPORTED_IMAGES = {
-    ".jpg",
-    ".jpeg",
-    ".png",
-    ".webp"
-}
+# =========================================================
+# IMAGE PROCESSOR
+#
+# Support:
+# PNG
+# JPG
+# JPEG
+#
+# Fungsi:
+# - Validasi gambar
+# - OCR teks dalam gambar
+# - Memberikan konteks ke Vision AI
+#
+# =========================================================
+
 
 
 def process_image(
-    filename,
-    prompt=None
+    filename
 ):
 
-    extension = os.path.splitext(
-        filename
-    )[1].lower()
 
-
-    if extension not in SUPPORTED_IMAGES:
+    if not os.path.exists(filename):
 
         raise Exception(
-            "IMAGE_FORMAT_NOT_SUPPORTED"
+            "IMAGE_NOT_FOUND"
         )
 
 
-    # Pastikan file benar-benar gambar
 
-    with Image.open(filename) as image:
+    try:
+
+
+        image = Image.open(
+
+            filename
+
+        )
+
+
 
         image.verify()
 
 
-    print(
-        f"IMAGE PROCESS → {filename}"
+
+    except Exception as error:
+
+
+        raise Exception(
+
+            f"INVALID_IMAGE: {error}"
+
+        )
+
+
+
+
+    # buka ulang setelah verify
+
+    image = Image.open(
+
+        filename
+
     )
 
 
-    answer = analyze_image(
-        filename,
-        prompt
+
+    result = []
+
+
+
+    # ===================================
+    # INFO GAMBAR
+    # ===================================
+
+
+    result.append(
+
+        f"""
+INFORMASI GAMBAR:
+
+Nama file:
+{os.path.basename(filename)}
+
+Ukuran:
+{image.size}
+
+Format:
+{image.format}
+
+Mode:
+{image.mode}
+
+"""
+
     )
 
 
-    return answer
+
+    # ===================================
+    # OCR
+    # ===================================
+
+
+    try:
+
+
+        text = pytesseract.image_to_string(
+
+            image,
+
+            lang="eng"
+
+        )
+
+
+
+        if text.strip():
+
+
+            result.append(
+
+                """
+
+HASIL OCR:
+
+"""
+
+                + text.strip()
+
+            )
+
+
+
+    except Exception as error:
+
+
+        result.append(
+
+            "OCR tidak tersedia."
+
+        )
+
+
+
+
+    # ===================================
+    # RETURN CONTEXT
+    # ===================================
+
+
+    return "\n\n".join(
+
+        result
+
+    )
