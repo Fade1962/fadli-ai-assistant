@@ -1,0 +1,53 @@
+name: Fadli AI Chat 24/7
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    - cron: "0 0 * * *"
+    - cron: "0 6 * * *"
+    - cron: "0 12 * * *"
+    - cron: "0 18 * * *"
+
+concurrency:
+  group: fadli-ai-chat
+  cancel-in-progress: true
+
+jobs:
+
+  chat:
+
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 350
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Clear Telegram Webhook
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        run: |
+          curl -s "https://api.telegram.org/bot${TELEGRAM_TOKEN}/deleteWebhook?drop_pending_updates=false"
+
+      - name: Run Fadli AI Chat
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
+        run: |
+          python chat.py
