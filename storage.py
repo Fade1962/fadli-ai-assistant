@@ -192,6 +192,14 @@ def recent_messages(chat_id, limit=12):
     return list(reversed(rows))
 
 
+
+
+def clear_messages(chat_id):
+    with connect() as conn:
+        cur = conn.execute("DELETE FROM messages WHERE chat_id=?", (chat_id,))
+        return cur.rowcount
+
+
 def add_memory(chat_id, content):
     content = (content or "").strip()
     if not content:
