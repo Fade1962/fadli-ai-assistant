@@ -5,12 +5,12 @@ from PIL import Image
 from ai_processor.vision import analyze_image
 
 
-SUPPORTED_IMAGES = (
+SUPPORTED_IMAGES = {
     ".jpg",
     ".jpeg",
     ".png",
     ".webp"
-)
+}
 
 
 def process_image(
@@ -22,37 +22,30 @@ def process_image(
         filename
     )[1].lower()
 
+
     if extension not in SUPPORTED_IMAGES:
 
         raise Exception(
             "IMAGE_FORMAT_NOT_SUPPORTED"
         )
 
-    try:
 
-        # Pastikan file benar-benar gambar
-        image = Image.open(
-            filename
-        )
+    # Pastikan file benar-benar gambar
+
+    with Image.open(filename) as image:
 
         image.verify()
 
-        answer, ai_name = analyze_image(
-            filename,
-            prompt
-        )
 
-        return (
-            answer
-            + "\n\n———\n"
-            + f"👁️ Vision • {ai_name}"
-        )
+    print(
+        f"IMAGE PROCESS → {filename}"
+    )
 
-    except Exception as error:
 
-        print(
-            "IMAGE PROCESS ERROR:",
-            repr(error)
-        )
+    answer = analyze_image(
+        filename,
+        prompt
+    )
 
-        raise
+
+    return answer
