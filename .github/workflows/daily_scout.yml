@@ -25,6 +25,6 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
-           AI_PROVIDER_ORDER: openai,gemini,groq,openrouter
+          AI_PROVIDER_ORDER: openai,gemini,groq,openrouter
            
         run: python scout_once.py
