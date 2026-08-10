@@ -1,16 +1,45 @@
+import os
+
 from PIL import Image
+
 import pytesseract
 
 
-def read_image(path):
+def process_image(filename):
 
-    img = Image.open(path)
+    try:
 
-    text = pytesseract.image_to_string(
-        img
-    )
+        image = Image.open(filename)
 
-    return (
-        "Gambar berhasil dibaca.\n\n"
-        + text[:12000]
-    )
+        image = image.convert("RGB")
+
+        text = pytesseract.image_to_string(
+            image
+        )
+
+        text = text.strip()
+
+
+        if text:
+
+            return (
+                "HASIL OCR GAMBAR:\n\n"
+                + text
+            )
+
+
+        return (
+            "Gambar berhasil dibaca, "
+            "tetapi tidak ditemukan teks "
+            "yang dapat diekstrak."
+        )
+
+
+    except Exception as error:
+
+        print(
+            "IMAGE PROCESS ERROR:",
+            repr(error)
+        )
+
+        raise
