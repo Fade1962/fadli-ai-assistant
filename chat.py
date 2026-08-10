@@ -8,60 +8,69 @@ from google.genai import types
 
 
 # =========================================================
-# CONFIG
+# ENV
 # =========================================================
 
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 CHAT_ID = str(os.environ["CHAT_ID"])
-GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
+
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 
 TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
 MEMORY_FILE = "memory.json"
 
-client = genai.Client(
-    api_key=GEMINI_API_KEY
-)
+
+# =========================================================
+# GEMINI
+# =========================================================
+
+gemini = None
+
+if GEMINI_API_KEY:
+    gemini = genai.Client(
+        api_key=GEMINI_API_KEY
+    )
 
 
 # =========================================================
-# SYSTEM PROMPT
+# PERSONAL BRANDING
 # =========================================================
 
 SYSTEM_PROMPT = """
 Kamu adalah FADLI AI PERSONAL BRANDING ASSISTANT.
 
-Tugas utama:
-Menjadi partner berpikir Fadli untuk membangun personal
-branding di TikTok, Instagram Reels, YouTube Shorts
-dan media sosial.
+Kamu adalah partner berpikir Fadli untuk membangun
+personal branding di TikTok, Instagram Reels,
+YouTube Shorts dan media sosial.
 
-IDENTITAS:
+IDENTITAS FADLI:
 
-Fadli:
-- Suami.
-- Ayah 2 anak.
-- Seorang pekerja.
-- Marketing Communication.
-- Designer.
-- Social media.
-- Motion graphic.
-- Video editing.
-- Digital marketing.
-- AI dan teknologi.
-- Marketing otomotif.
-- Sedang berusaha meningkatkan ekonomi keluarga.
-- Sedang belajar skill baru.
-- Sedang membangun personal branding.
+- Suami
+- Ayah 2 anak
+- Pekerja
+- Marketing Communication
+- Designer
+- Social media
+- Motion graphic
+- Video editing
+- Digital marketing
+- AI dan teknologi
+- Marketing otomotif
+- Sedang berusaha meningkatkan ekonomi keluarga
+- Sedang belajar skill baru
+- Sedang membangun personal branding
 
 POSITIONING:
 
-"Seorang bapak 2 anak yang bekerja, belajar,
-berjuang memperbaiki kehidupan keluarga,
-dan memanfaatkan teknologi serta kreativitas
-untuk berkembang."
+"Bapak 2 anak yang bekerja, belajar, berjuang
+memperbaiki kehidupan keluarga dan memanfaatkan
+teknologi serta kreativitas untuk berkembang."
 
 JANGAN membuat Fadli terlihat seperti:
+
 - motivator sukses
 - orang kaya
 - financial guru
@@ -72,13 +81,14 @@ GAYA:
 - natural
 - jujur
 - relatable
+- komunikatif
 - sederhana
 - personal
 - tidak menggurui
 - tidak sok sukses
 - tidak berlebihan
 
-PILAR KONTEN:
+PILAR:
 
 1. Kehidupan pekerja
 2. Ekonomi keluarga
@@ -98,11 +108,9 @@ PILAR KONTEN:
 16. Tren internet
 17. Otomotif jika relevan
 
-PRINSIP:
+Kamu boleh tidak setuju dengan Fadli.
 
-Jangan selalu menyetujui ide Fadli.
-
-Jika idenya lemah:
+Kalau ide Fadli lemah:
 - katakan lemah
 - jelaskan alasannya
 - berikan angle yang lebih kuat
@@ -115,11 +123,11 @@ INSIGHT
 ENDING
 CTA
 
-Target:
+Target video:
 30-60 detik.
 
-Bahasa harus terdengar seperti orang Indonesia
-berbicara, bukan artikel.
+Bahasa harus seperti manusia Indonesia berbicara,
+bukan artikel dan bukan bahasa AI.
 
 Jangan mengarang pengalaman pribadi Fadli.
 
@@ -127,7 +135,10 @@ Jangan mengarang berita atau data.
 
 Jangan mengeksploitasi anak dan keluarga.
 
-Jika membahas tren terbaru, gunakan Google Search.
+Untuk tren terbaru, gunakan sumber web jika tersedia.
+
+MEMORY FADLI harus digunakan sebagai preferensi,
+bukan sebagai fakta baru.
 """
 
 
@@ -138,27 +149,20 @@ Jika membahas tren terbaru, gunakan Google Search.
 def load_memory():
 
     try:
-
         with open(
             MEMORY_FILE,
             "r",
             encoding="utf-8"
-        ) as file:
-
-            return json.load(file)
+        ) as f:
+            return json.load(f)
 
     except Exception:
 
         return {
-            "liked": [],
-            "disliked": [],
             "scores": [],
             "feedback": [],
             "preferred_topics": [],
-            "avoided_topics": [],
-            "content_style": {
-                "tone": "natural, jujur, relatable"
-            }
+            "avoided_topics": []
         }
 
 
@@ -168,40 +172,34 @@ def save_memory(memory):
         MEMORY_FILE,
         "w",
         encoding="utf-8"
-    ) as file:
+    ) as f:
 
         json.dump(
             memory,
-            file,
+            f,
             ensure_ascii=False,
             indent=2
         )
 
 
-def get_memory_summary():
+def memory_summary():
 
     memory = load_memory()
 
     return f"""
-PREFERENSI FADLI:
+MEMORY FADLI
 
 TOPIK DISUKAI:
 {memory.get("preferred_topics", [])}
 
-TOPIK TIDAK DISUKAI:
+TOPIK DIHINDARI:
 {memory.get("avoided_topics", [])}
-
-FEEDBACK POSITIF:
-{memory.get("liked", [])[-10:]}
-
-FEEDBACK NEGATIF:
-{memory.get("disliked", [])[-10:]}
 
 SCORE TERBARU:
 {memory.get("scores", [])[-15:]}
 
-GAYA:
-{memory.get("content_style", {})}
+FEEDBACK TERBARU:
+{memory.get("feedback", [])[-15:]}
 """
 
 
@@ -211,78 +209,267 @@ GAYA:
 
 def ask_gemini(
     text,
-    use_search=False
+    search=False
 ):
+
+    if not gemini:
+
+        raise Exception(
+            "GEMINI_API_KEY tidak tersedia"
+        )
+
+    config = None
+
+    if search:
+
+        config = types.GenerateContentConfig(
+            tools=[
+                types.Tool(
+                    google_search=types.GoogleSearch()
+                )
+            ]
+        )
+
+    response = gemini.models.generate_content(
+
+        model="gemini-3.1-flash-lite",
+
+        contents=[
+            SYSTEM_PROMPT,
+            memory_summary(),
+            "\nPESAN FADLI:\n",
+            text
+        ],
+
+        config=config
+    )
+
+    if not response.text:
+
+        raise Exception(
+            "Gemini tidak memberikan jawaban"
+        )
+
+    return response.text
+
+
+# =========================================================
+# GROQ
+# =========================================================
+
+def ask_groq(text):
+
+    if not GROQ_API_KEY:
+
+        raise Exception(
+            "GROQ_API_KEY tidak tersedia"
+        )
+
+    response = requests.post(
+
+        "https://api.groq.com/openai/v1/chat/completions",
+
+        headers={
+            "Authorization":
+                f"Bearer {GROQ_API_KEY}",
+
+            "Content-Type":
+                "application/json"
+        },
+
+        json={
+            "model":
+                "llama-3.3-70b-versatile",
+
+            "messages": [
+
+                {
+                    "role": "system",
+                    "content":
+                        SYSTEM_PROMPT
+                        + "\n"
+                        + memory_summary()
+                },
+
+                {
+                    "role": "user",
+                    "content": text
+                }
+            ],
+
+            "temperature": 0.7,
+
+            "max_tokens": 1500
+        },
+
+        timeout=45
+    )
+
+    response.raise_for_status()
+
+    data = response.json()
+
+    return data["choices"][0]["message"]["content"]
+
+
+# =========================================================
+# OPENROUTER
+# =========================================================
+
+def ask_openrouter(text):
+
+    if not OPENROUTER_API_KEY:
+
+        raise Exception(
+            "OPENROUTER_API_KEY tidak tersedia"
+        )
+
+    response = requests.post(
+
+        "https://openrouter.ai/api/v1/chat/completions",
+
+        headers={
+            "Authorization":
+                f"Bearer {OPENROUTER_API_KEY}",
+
+            "Content-Type":
+                "application/json",
+
+            "HTTP-Referer":
+                "https://github.com",
+
+            "X-Title":
+                "Fadli AI Assistant"
+        },
+
+        json={
+            "model":
+                "openrouter/free",
+
+            "messages": [
+
+                {
+                    "role": "system",
+                    "content":
+                        SYSTEM_PROMPT
+                        + "\n"
+                        + memory_summary()
+                },
+
+                {
+                    "role": "user",
+                    "content": text
+                }
+            ],
+
+            "temperature": 0.7,
+
+            "max_tokens": 1500
+        },
+
+        timeout=60
+    )
+
+    response.raise_for_status()
+
+    data = response.json()
+
+    return data["choices"][0]["message"]["content"]
+
+
+# =========================================================
+# AI ROUTER
+# =========================================================
+
+def ask_ai(
+    text,
+    search=False
+):
+
+    # =====================================================
+    # 1. GEMINI
+    # =====================================================
 
     try:
 
-        config = None
+        print("AI ROUTER → Gemini")
 
-        if use_search:
-
-            config = types.GenerateContentConfig(
-                tools=[
-                    types.Tool(
-                        google_search=types.GoogleSearch()
-                    )
-                ]
-            )
-
-        response = client.models.generate_content(
-
-            model="gemini-3.1-flash-lite",
-
-            contents=[
-                SYSTEM_PROMPT,
-                get_memory_summary(),
-                "\nPERTANYAAN FADLI:\n",
-                text
-            ],
-
-            config=config
+        return ask_gemini(
+            text,
+            search=search
         )
-
-        if not response.text:
-
-            return "⚠️ Gemini tidak memberikan jawaban."
-
-        return response.text
 
     except Exception as error:
 
         print(
-            "GEMINI ERROR:",
+            "Gemini gagal:",
             repr(error)
         )
 
-        return (
-            "⚠️ Gemini sedang mencapai batas quota "
-            "atau mengalami error.\n\n"
-            f"{str(error)[:500]}"
+
+    # =====================================================
+    # 2. GROQ
+    # =====================================================
+
+    try:
+
+        print("AI ROUTER → Groq")
+
+        return ask_groq(text)
+
+    except Exception as error:
+
+        print(
+            "Groq gagal:",
+            repr(error)
         )
+
+
+    # =====================================================
+    # 3. OPENROUTER
+    # =====================================================
+
+    try:
+
+        print("AI ROUTER → OpenRouter")
+
+        return ask_openrouter(text)
+
+    except Exception as error:
+
+        print(
+            "OpenRouter gagal:",
+            repr(error)
+        )
+
+
+    return (
+        "⚠️ Semua AI sedang mencapai limit "
+        "atau tidak tersedia.\n\n"
+        "Coba beberapa saat lagi."
+    )
 
 
 # =========================================================
 # MEMORY COMMANDS
 # =========================================================
 
-def save_score(text):
+def add_score(value):
 
     memory = load_memory()
 
-    memory["scores"].append(text)
+    memory["scores"].append(value)
 
-    # Batasi memory supaya file tidak membesar terus.
     memory["scores"] = memory["scores"][-100:]
 
     save_memory(memory)
 
 
-def save_feedback(text):
+def add_feedback(value):
 
     memory = load_memory()
 
-    memory["feedback"].append(text)
+    memory["feedback"].append(value)
 
     memory["feedback"] = memory["feedback"][-100:]
 
@@ -298,38 +485,27 @@ def send_message(
     text
 ):
 
-    max_length = 4000
-
     for i in range(
         0,
         len(text),
-        max_length
+        4000
     ):
 
-        try:
+        part = text[
+            i:i + 4000
+        ]
 
-            response = requests.post(
+        requests.post(
 
-                f"{TELEGRAM_URL}/sendMessage",
+            f"{TELEGRAM_URL}/sendMessage",
 
-                data={
-                    "chat_id": chat_id,
-                    "text": text[
-                        i:i + max_length
-                    ]
-                },
+            data={
+                "chat_id": chat_id,
+                "text": part
+            },
 
-                timeout=30
-            )
-
-            response.raise_for_status()
-
-        except Exception as error:
-
-            print(
-                "TELEGRAM ERROR:",
-                repr(error)
-            )
+            timeout=30
+        )
 
 
 def get_updates(
@@ -360,8 +536,8 @@ def get_updates(
 def run_bot():
 
     print("==============================")
-    print("FADLI AI")
-    print("24/7 TELEGRAM BOT")
+    print("FADLI AI 24/7")
+    print("MULTI AI ROUTER")
     print("==============================")
 
     offset = None
@@ -404,7 +580,7 @@ def run_bot():
                     message["chat"]["id"]
                 )
 
-                # SECURITY
+                # Hanya Fadli
                 if chat_id != CHAT_ID:
 
                     continue
@@ -416,23 +592,29 @@ def run_bot():
                     text
                 )
 
+
                 # =================================================
-                # SIMPLE COMMAND
+                # PING
                 # =================================================
 
                 if lower == "/ping":
 
                     send_message(
                         chat_id,
-                        "🟢 Fadli AI online."
+                        "🟢 Fadli AI online 24/7."
                     )
 
                     continue
 
 
+                # =================================================
+                # START
+                # =================================================
+
                 if lower == "/start":
 
                     send_message(
+
                         chat_id,
 
                         """🤖 FADLI AI PERSONAL BRANDING
@@ -440,12 +622,13 @@ def run_bot():
 Saya siap menjadi partner diskusi Anda.
 
 🔥 Analisis tren
-🎯 Scoring
-🎬 Script
-💡 Ide konten
-🧠 Kritik konsep
-📱 TikTok/Reels
+🎯 Scoring tren
+🎬 Membuat script
+💡 Brainstorming
+🧠 Kritik ide
+📱 TikTok / Reels
 ❤️ Personal branding
+📊 Belajar dari feedback
 
 COMMAND:
 
@@ -457,10 +640,9 @@ COMMAND:
 Contoh:
 
 /score ekonomi 9
-/score AI 8
-/feedback saya ingin lebih banyak konten ekonomi keluarga
+/feedback lebih banyak konten ekonomi keluarga
 
-Atau langsung chat seperti biasa."""
+Atau langsung ngobrol seperti biasa."""
                     )
 
                     continue
@@ -474,37 +656,12 @@ Atau langsung chat seperti biasa."""
 
                     memory = load_memory()
 
-                    summary = {
-                        "preferred_topics":
-                            memory.get(
-                                "preferred_topics",
-                                []
-                            ),
-
-                        "avoided_topics":
-                            memory.get(
-                                "avoided_topics",
-                                []
-                            ),
-
-                        "scores":
-                            memory.get(
-                                "scores",
-                                []
-                            )[-20:],
-
-                        "feedback":
-                            memory.get(
-                                "feedback",
-                                []
-                            )[-20:]
-                    }
-
                     send_message(
+
                         chat_id,
 
                         json.dumps(
-                            summary,
+                            memory,
                             ensure_ascii=False,
                             indent=2
                         )
@@ -519,16 +676,17 @@ Atau langsung chat seperti biasa."""
 
                 if lower.startswith("/score"):
 
-                    score_text = text[
+                    value = text[
                         len("/score"):
                     ].strip()
 
-                    if not score_text:
+                    if not value:
 
                         send_message(
+
                             chat_id,
 
-                            "Format:\n\n"
+                            "Contoh:\n"
                             "/score ekonomi 9\n"
                             "/score AI 8\n"
                             "/score parenting 7"
@@ -536,17 +694,18 @@ Atau langsung chat seperti biasa."""
 
                         continue
 
-                    save_score(
-                        score_text
+                    add_score(
+                        value
                     )
 
                     send_message(
+
                         chat_id,
 
                         "📊 Score tersimpan.\n\n"
-                        f"→ {score_text}\n\n"
+                        f"→ {value}\n\n"
                         "Saya akan gunakan untuk "
-                        "menyesuaikan rekomendasi tren "
+                        "menyesuaikan rekomendasi "
                         "berikutnya."
                     )
 
@@ -557,42 +716,44 @@ Atau langsung chat seperti biasa."""
                 # FEEDBACK
                 # =================================================
 
-                if lower.startswith("/feedback"):
+                if lower.startswith(
+                    "/feedback"
+                ):
 
-                    feedback = text[
+                    value = text[
                         len("/feedback"):
                     ].strip()
 
-                    if not feedback:
+                    if not value:
 
                         send_message(
+
                             chat_id,
 
                             "Contoh:\n\n"
-                            "/feedback saya ingin lebih "
-                            "banyak konten tentang ekonomi "
-                            "keluarga dan dunia kerja."
+                            "/feedback saya suka "
+                            "konten ekonomi keluarga "
+                            "yang realistis."
                         )
 
                         continue
 
-                    save_feedback(
-                        feedback
+                    add_feedback(
+                        value
                     )
 
                     send_message(
+
                         chat_id,
 
-                        "🧠 Feedback tersimpan.\n\n"
-                        "Saya akan gunakan untuk "
-                        "menyesuaikan gaya rekomendasi."
+                        "🧠 Feedback tersimpan."
                     )
 
                     continue
 
 
                 # =================================================
-                # SEARCH ROUTER
+                # SEARCH DETECTION
                 # =================================================
 
                 search_words = [
@@ -606,21 +767,19 @@ Atau langsung chat seperti biasa."""
                     "ramai",
                     "hype",
                     "berita",
-                    "tiktok",
-                    "instagram",
-                    "youtube",
-                    "harga terbaru",
-                    "kebijakan terbaru"
+                    "tiktok terbaru",
+                    "instagram terbaru",
+                    "youtube terbaru"
                 ]
 
-                use_search = any(
+                search = any(
                     word in lower
                     for word in search_words
                 )
 
 
                 # =================================================
-                # NORMAL AI CHAT
+                # AI
                 # =================================================
 
                 send_message(
@@ -628,9 +787,11 @@ Atau langsung chat seperti biasa."""
                     "🧠 Sedang berpikir..."
                 )
 
-                answer = ask_gemini(
+                answer = ask_ai(
+
                     text,
-                    use_search=use_search
+
+                    search=search
                 )
 
                 send_message(
@@ -648,10 +809,6 @@ Atau langsung chat seperti biasa."""
 
             time.sleep(5)
 
-
-# =========================================================
-# MAIN
-# =========================================================
 
 if __name__ == "__main__":
 
