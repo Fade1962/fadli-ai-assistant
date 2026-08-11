@@ -11,7 +11,7 @@ from context_builder import build_file_context, build_chat_context, build_memory
 from personal_context import build_personal_context, profile_summary
 from storage import (
     add_upload, recent_uploads, clear_uploads, list_reminders,
-    save_message, add_memory, list_memories, clear_memories,
+    save_message, add_memory, list_memories, clear_memories, clear_messages,
     rate_latest_radar_item,
 )
 from reminders import parse_reminder
@@ -45,32 +45,52 @@ def _needs_file_context(text):
 
 def _try_radar_rating(chat_id, text):
     raw = (text or "").strip().lower()
-    patterns = [
-        r"^(?:/rate\s+|rate\s+|rating\s+|nilai\s+)?(?:berita\s*)?#?(\d+)\s*(?:=|:|\s)\s*(\d+)\s*/\s*10$",
-        r"^(?:/rate\s+)(\d+)\s+(\d+)$",
-    ]
-    match = None
-    for pattern in patterns:
-        match = re.match(pattern, raw)
-        if match:
-            break
-    if not match:
-        return False
-    position, rating = int(match.group(1)), int(match.group(2))
-    if not 1 <= rating <= 10:
-        send_message(chat_id, "Rating harus 1-10.")
-        return True
-    row = rate_latest_radar_item(chat_id, position, rating)
-    if not row:
-        send_message(chat_id, "Berita itu belum ditemukan di Daily Radar terakhir.")
-        return True
-    if rating <= 3:
-        msg = f"Dicatat. Berita #{position} = {rating}/10. Topik serupa akan saya hindari."
-    elif rating >= 8:
-        msg = f"Dicatat. Berita #{position} = {rating}/10. Topik serupa akan lebih saya prioritaskan."
+
+    # Accept one or many ratings in natural forms, e.g.:
+    # 1=7/10 · 2=7/10 · 3=5/10 · 4=8/10
+    # skor berita: 1. 7, 2. 7, 3. 5, 4. 8
+    # 1 7 2 7 3 5 4 8
+    pairs = []
+    explicit = re.findall(r"(?<!\d)([1-9]\d?)\s*(?:=|:|\.|-)\s*(10|[1-9])(?:\s*/\s*10)?(?!\d)", raw)
+    if explicit:
+        pairs = [(int(a), int(b)) for a, b in explicit]
     else:
-        msg = f"Dicatat. Berita #{position} = {rating}/10."
-    send_message(chat_id, msg)
+        # Command-style single rating: /rate 2 8
+        m = re.fullmatch(r"(?:/rate\s+|rate\s+|rating\s+|nilai\s+)?(?:berita\s*)?#?(\d+)\s+(10|[1-9])(?:\s*/\s*10)?", raw)
+        if m:
+            pairs = [(int(m.group(1)), int(m.group(2)))]
+
+    # Only treat it as radar feedback if there is a rating signal, or multiple valid pairs.
+    rating_signal = any(k in raw for k in ("skor", "score", "rating", "nilai", "/rate", "berita"))
+    if not pairs or (len(pairs) == 1 and not rating_signal and "=" not in raw and "/10" not in raw):
+        return False
+
+    results = []
+    seen = set()
+    for position, rating in pairs:
+        if position in seen:
+            continue
+        seen.add(position)
+        if not 1 <= rating <= 10:
+            continue
+        row = rate_latest_radar_item(chat_id, position, rating)
+        if row:
+            results.append((position, rating))
+
+    if not results:
+        send_message(chat_id, "Berita yang dinilai belum ditemukan di Daily Radar terakhir.")
+        return True
+
+    summary = " · ".join(f"#{p} {r}/10" for p, r in results)
+    low = [p for p, r in results if r <= 3]
+    high = [p for p, r in results if r >= 8]
+    extra = []
+    if low:
+        extra.append("rating rendah akan menurunkan topik serupa")
+    if high:
+        extra.append("rating tinggi akan menaikkan topik serupa")
+    suffix = ". " + "; ".join(extra) + "." if extra else "."
+    send_message(chat_id, f"Dicatat: {summary}{suffix}")
     return True
 
 
@@ -133,6 +153,10 @@ def _handle_commands(chat_id, text):
     if low == "/clearmemory":
         n = clear_memories(chat_id)
         send_message(chat_id, f"🧹 {n} memory tambahan dihapus. Profil utama tetap aktif.")
+        return True
+    if low == "/clearhistory":
+        n = clear_messages(chat_id)
+        send_message(chat_id, f"🧹 {n} pesan riwayat chat dihapus. Profil dan memory yang disimpan tetap aman.")
         return True
     return False
 
