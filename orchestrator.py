@@ -16,9 +16,30 @@ from storage import (
 )
 from reminders import parse_reminder
 from telegram_client import send_message, send_document, download_file
+from response_guard import sanitize_output
 
 SUPPORTED_DOCS = {".pdf", ".docx", ".xlsx", ".xlsm", ".csv", ".pptx", ".txt", ".md", ".json", ".py"}
 SUPPORTED_IMAGES = {".png", ".jpg", ".jpeg", ".webp"}
+
+
+def _handle_quick_ack(chat_id, text):
+    """Handle trivial acknowledgements without calling an LLM.
+
+    This keeps simple chat fast and guarantees no reasoning text can leak for messages
+    like "ok terima kasih".
+    """
+    normalized = re.sub(r"[^a-z0-9\s]", "", (text or "").lower()).strip()
+    normalized = re.sub(r"\s+", " ", normalized)
+    exact = {
+        "ok", "oke", "okay", "sip", "siap", "noted",
+        "terima kasih", "terimakasih", "makasih", "thanks", "thank you",
+        "ok terima kasih", "oke terima kasih", "sip terima kasih",
+        "ok makasih", "oke makasih", "siap terima kasih",
+    }
+    if normalized in exact:
+        send_message(chat_id, "Sama-sama. Kalau ada yang mau dikerjakan lagi, kirim saja.")
+        return True
+    return False
 
 
 def _output_type(text):
@@ -184,6 +205,8 @@ def _compose_prompt(chat_id, text):
 
 
 def handle_text(chat_id, text):
+    if _handle_quick_ack(chat_id, text):
+        return
     if _try_radar_rating(chat_id, text):
         return
     if _handle_commands(chat_id, text):
@@ -204,6 +227,7 @@ def handle_text(chat_id, text):
 
     try:
         answer, provider = ask_ai(SYSTEM_PROMPT, user_prompt)
+        answer = sanitize_output(answer)
     except Exception as exc:
         send_message(chat_id, f"AI gratis sedang tidak tersedia.\n{exc}")
         return
@@ -246,6 +270,7 @@ def handle_document(chat_id, document, caption=""):
             if prompt and profile:
                 prompt = f"{profile}\n\nINSTRUKSI:\n{prompt}"
             answer, _ = ask_vision(path, prompt)
+            answer = sanitize_output(answer)
             add_upload(chat_id, safe_name, path, answer, kind="image")
             send_message(chat_id, answer + "\n\n📌 Deskripsi gambar disimpan dalam sesi file.")
             return
@@ -278,6 +303,7 @@ def handle_photo(chat_id, photos, caption=""):
         if prompt and profile:
             prompt = f"{profile}\n\nINSTRUKSI:\n{prompt}"
         answer, _ = ask_vision(path, prompt)
+        answer = sanitize_output(answer)
         add_upload(chat_id, safe_name, path, answer, kind="image")
         send_message(chat_id, answer + "\n\n📌 Deskripsi disimpan dalam sesi file.")
     except Exception as exc:
