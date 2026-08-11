@@ -1,12 +1,14 @@
 import re
 
-_INTERNAL_HEADINGS = (
+# Headings/phrases that should never reach the user-facing Telegram message.
+_INTERNAL_MARKERS = (
     "analyze user input",
     "identify core need",
     "determine what i can actually do",
     "structure response",
     "draft response",
     "draft - mental refinement",
+    "draft mental refinement",
     "mental refinement",
     "final polish",
     "check constraints",
@@ -15,27 +17,67 @@ _INTERNAL_HEADINGS = (
     "refinement during thought",
     "reasoning",
     "internal analysis",
+    "core need",
+    "mental draft",
 )
 
 _EXPLICIT_FINAL_RE = re.compile(
-    r"(?:^|\n)\s*(?:final answer|final response|jawaban final)\s*:?\s*\n+(.*)$",
+    r"(?:^|\n)\s*[#>*_\- ]*(?:final answer|final response|jawaban final)"
+    r"[*_ ]*:?\s*\n+(.*)$",
     re.IGNORECASE | re.DOTALL,
 )
 
+# Common completion phrases seen when models accidentally expose their drafting process.
+_COMPLETION_MARKERS = (
+    "ready. output matches response.",
+    "ready. output matches response",
+    "output matches response.",
+    "output matches response",
+    "all good. output matches draft.",
+    "all good. output matches draft",
+    "output matches draft.",
+    "output matches draft",
+    "ready. output matches draft.",
+    "ready. output matches draft",
+)
+
+
+def _normalize_for_detection(text):
+    """Normalize markdown decoration so *Analyze User Input:* is still detected."""
+    value = (text or "").lower()
+    value = re.sub(r"[`*_>#~]", "", value)
+    value = re.sub(r"\s+", " ", value)
+    return value.strip()
+
 
 def contains_internal_process(text):
-    low = (text or "").lower()
-    hits = sum(1 for marker in _INTERNAL_HEADINGS if marker in low)
-    numbered_meta = bool(re.search(r"(?mi)^\s*\d+\.\s*\*{0,2}(?:analyze user input|identify core need|draft|final polish|check constraints)", text or ""))
+    if not text:
+        return False
+    normalized = _normalize_for_detection(text)
+    hits = sum(1 for marker in _INTERNAL_MARKERS if marker in normalized)
+
+    numbered_meta = bool(
+        re.search(
+            r"(?mi)^\s*\d+\.\s*[#>*_\- ]*(?:analyze user input|identify core need|"
+            r"draft(?: response)?|final polish|check constraints|refine against constraints)",
+            text,
+        )
+    )
     return hits >= 2 or numbered_meta
 
 
-def sanitize_output(text):
-    """Best-effort guardrail that removes planning/reasoning text before Telegram output.
+def _clean_candidate(candidate):
+    candidate = (candidate or "").strip()
+    candidate = re.sub(r"^[\s\-:–—✅]+", "", candidate).strip()
+    return candidate
 
-    This is deliberately conservative: normal answers are returned unchanged. If the
-    model emits multiple known internal-planning markers, keep only the final user-facing
-    segment when one can be identified.
+
+def sanitize_output(text):
+    """Return only the final user-facing answer.
+
+    This guard is intentionally defensive because free models can occasionally emit
+    planning notes even when prompted not to. If a clean final answer cannot be
+    extracted, internal content is never sent to Telegram.
     """
     text = (text or "").strip()
     if not text:
@@ -43,50 +85,48 @@ def sanitize_output(text):
     if not contains_internal_process(text):
         return text
 
-    # 1) Prefer an explicit final-answer block if present.
+    # 1) Best case: explicit final answer block.
     matches = list(_EXPLICIT_FINAL_RE.finditer(text))
     if matches:
-        candidate = matches[-1].group(1).strip()
-        if candidate:
-            return candidate
-
-    # 2) Common leak pattern: internal plan ends with these markers, then the real answer.
-    tail_markers = (
-        "self-correction/refinement during thought:",
-        "self-correction/refinement during thought",
-        "ready. output matches response.",
-        "ready. output matches response",
-    )
-    low = text.lower()
-    best_pos = -1
-    best_marker = None
-    for marker in tail_markers:
-        pos = low.rfind(marker)
-        if pos > best_pos:
-            best_pos = pos
-            best_marker = marker
-    if best_pos >= 0 and best_marker:
-        candidate = text[best_pos + len(best_marker):].strip(" \n:-")
-        # Sometimes another empty meta heading follows before the real answer.
-        candidate = re.sub(
-            r"(?is)^\s*(?:self-correction(?:/refinement during thought)?|refinement during thought)\s*:?\s*",
-            "",
-            candidate,
-        ).strip()
+        candidate = _clean_candidate(matches[-1].group(1))
         if candidate and not contains_internal_process(candidate):
             return candidate
 
-    # 3) If a visible check/ready block is followed by a separated final paragraph,
-    # choose the last substantial paragraph that itself is not meta commentary.
+    low = text.lower()
+
+    # 2) Extract everything after a known completion marker.
+    best_end = -1
+    for marker in _COMPLETION_MARKERS:
+        pos = low.rfind(marker)
+        if pos >= 0:
+            best_end = max(best_end, pos + len(marker))
+    if best_end >= 0:
+        candidate = _clean_candidate(text[best_end:])
+        if candidate and not contains_internal_process(candidate):
+            return candidate
+
+    # 3) A leaked reasoning block often ends with a checkmark, followed by the real answer.
+    # Only use this heuristic when internal process was already positively detected.
+    check_pos = text.rfind("✅")
+    if check_pos >= 0:
+        candidate = _clean_candidate(text[check_pos + 1:])
+        if candidate and len(candidate) >= 5 and not contains_internal_process(candidate):
+            return candidate
+
+    # 4) Search backwards for the last substantial paragraph that is not meta commentary.
     paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
     for paragraph in reversed(paragraphs):
-        plow = paragraph.lower()
-        if any(marker in plow for marker in _INTERNAL_HEADINGS):
+        pnorm = _normalize_for_detection(paragraph)
+        if any(marker in pnorm for marker in _INTERNAL_MARKERS):
             continue
-        if plow.startswith(("looks solid", "ready.", "check ", "matches response")):
+        if pnorm.startswith((
+            "looks solid", "ready", "all good", "check ", "matches response",
+            "output matches", "language:", "context:", "goal:", "constraints:",
+        )):
             continue
-        if len(paragraph) >= 20:
-            return paragraph
+        candidate = _clean_candidate(paragraph)
+        if len(candidate) >= 5 and not contains_internal_process(candidate):
+            return candidate
 
-    # Do not expose the internal text if extraction failed.
-    return "Maaf, respons tadi tidak terbentuk dengan bersih. Coba kirim ulang pertanyaannya secara singkat."
+    # Never expose the analysis if extraction fails.
+    return "Maaf, jawaban tadi tidak terbentuk dengan bersih. Coba kirim ulang secara singkat."
