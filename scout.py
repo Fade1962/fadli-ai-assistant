@@ -8,6 +8,7 @@ from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 from ai_processor.router import ask_ai
+from response_guard import sanitize_output
 from personal_context import build_digest_profile
 from config import TIMEZONE
 from storage import (
@@ -132,6 +133,7 @@ def _select_items(news, profile, bad, good, count=4):
     )
 
     result, _ = ask_ai(system, user, mode="auto")
+    result = sanitize_output(result)
     chosen = _extract_json_array(result)
 
     selected, used = [], set()
