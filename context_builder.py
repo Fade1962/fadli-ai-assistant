@@ -1,6 +1,7 @@
 import re
 from config import MAX_CONTEXT_CHARS, RECENT_FILE_LIMIT, RECENT_HISTORY_LIMIT
 from storage import recent_uploads, recent_messages, list_memories
+from response_guard import sanitize_output, contains_internal_process
 
 STOPWORDS = {
     "yang","dan","di","ke","dari","ini","itu","untuk","dengan","saya","file","data",
@@ -66,9 +67,19 @@ def build_chat_context(chat_id):
     rows = recent_messages(chat_id, RECENT_HISTORY_LIMIT)
     if not rows:
         return ""
-    return "RIWAYAT PERCAKAPAN TERBARU:\n" + "\n".join(
-        f"{('Fadli' if r['role']=='user' else 'NARA')}: {r['content']}" for r in rows
-    )
+    lines = []
+    for r in rows:
+        content = r["content"] or ""
+        if r["role"] == "assistant":
+            # Old leaked reasoning may already exist in the persistent SQLite cache.
+            # Sanitize it before it is ever sent back into a model prompt.
+            content = sanitize_output(content)
+            if not content or contains_internal_process(content):
+                continue
+        lines.append(f"{('Fadli' if r['role']=='user' else 'NARA')}: {content}")
+    if not lines:
+        return ""
+    return "RIWAYAT PERCAKAPAN TERBARU:\n" + "\n".join(lines)
 
 
 def build_memory_context(chat_id):
